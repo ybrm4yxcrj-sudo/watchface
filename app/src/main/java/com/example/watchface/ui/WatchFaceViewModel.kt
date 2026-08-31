@@ -33,6 +33,9 @@ data class WatchFaceUiState(
     val currentWallpaper: WatchWallpaper? = null,
     val allWallpapers: List<WatchWallpaper> = emptyList(),
     val rotationMode: ImageRotationMode = ImageRotationMode.ON_WAKE,
+    val customImageDir: String = Config.IMAGE_DIR,
+    val dirImageCount: Int = 0,
+    val dirExists: Boolean = true,
     val overlayAlpha: Float = 0f,
     val screenBrightness: Float = Config.BRIGHTNESS_ACTIVE,
     val rawLux: Float = 50f,
@@ -83,6 +86,7 @@ class WatchFaceViewModel : ViewModel() {
         val savedIndex = sharedPrefs?.getInt("pref_wallpaper_index", 0) ?: 0
         val savedPixelShift = sharedPrefs?.getBoolean("pref_pixel_shift", true) ?: true
         val savedCircadian = sharedPrefs?.getBoolean("pref_circadian_brightness", true) ?: true
+        val savedCustomDir = sharedPrefs?.getString("pref_custom_image_dir", Config.IMAGE_DIR) ?: Config.IMAGE_DIR
 
         burnInGuard.setEnabled(savedPixelShift)
 
@@ -92,6 +96,7 @@ class WatchFaceViewModel : ViewModel() {
         _uiState.update {
             it.copy(
                 rotationMode = savedMode,
+                customImageDir = savedCustomDir,
                 activeTimeoutMs = savedTimeout,
                 dimImageScale = savedScale,
                 showImageInDim = savedShowDim,
@@ -103,9 +108,11 @@ class WatchFaceViewModel : ViewModel() {
 
         imageProvider = ImageProvider(appContext).apply {
             setRotationMode(savedMode)
+            setDirectory(savedCustomDir)
         }
 
-        val wallpapers = imageProvider!!.refreshWallpapers()
+        val (count, exists) = imageProvider!!.scanDirectoryStats(savedCustomDir)
+        val wallpapers = imageProvider!!.refreshWallpapers(savedCustomDir)
         val initialBitmap = if (savedMode == ImageRotationMode.FIXED && wallpapers.isNotEmpty()) {
             imageProvider!!.selectWallpaperIndex(savedIndex)
         } else {
@@ -116,6 +123,8 @@ class WatchFaceViewModel : ViewModel() {
         _uiState.update {
             it.copy(
                 allWallpapers = wallpapers,
+                dirImageCount = count,
+                dirExists = exists,
                 currentBitmap = initialBitmap,
                 currentWallpaper = initialWp
             )
@@ -343,16 +352,40 @@ class WatchFaceViewModel : ViewModel() {
     }
 
     fun refreshWallpapers() {
-        val list = imageProvider?.refreshWallpapers() ?: emptyList()
+        val currentDir = _uiState.value.customImageDir
+        val (count, exists) = imageProvider?.scanDirectoryStats(currentDir) ?: Pair(0, false)
+        val list = imageProvider?.refreshWallpapers(currentDir) ?: emptyList()
         val bmp = imageProvider?.getWallpaperForMode(triggerWake = false)
         val wp = imageProvider?.getCurrentWallpaper()
         _uiState.update {
             it.copy(
                 allWallpapers = list,
+                dirImageCount = count,
+                dirExists = exists,
                 currentBitmap = bmp,
                 currentWallpaper = wp
             )
         }
+    }
+
+    fun setCustomImageDir(path: String) {
+        val cleanPath = path.trim()
+        imageProvider?.setDirectory(cleanPath)
+        val (count, exists) = imageProvider?.scanDirectoryStats(cleanPath) ?: Pair(0, false)
+        val list = imageProvider?.refreshWallpapers(cleanPath) ?: emptyList()
+        val bmp = imageProvider?.getWallpaperForMode(triggerWake = false)
+        val wp = imageProvider?.getCurrentWallpaper()
+        _uiState.update {
+            it.copy(
+                customImageDir = cleanPath,
+                allWallpapers = list,
+                dirImageCount = count,
+                dirExists = exists,
+                currentBitmap = bmp,
+                currentWallpaper = wp
+            )
+        }
+        sharedPrefs?.edit()?.putString("pref_custom_image_dir", cleanPath)?.apply()
     }
 
     fun setManualLuxOverride(lux: Float?) {

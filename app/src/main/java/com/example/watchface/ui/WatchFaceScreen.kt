@@ -37,7 +37,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Nightlight
@@ -57,6 +61,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -64,7 +70,10 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -101,6 +110,7 @@ fun WatchFaceScreen(
     onSetActiveTimeout: (Long) -> Unit,
     onSelectWallpaper: (Int) -> Unit,
     onRefreshWallpapers: () -> Unit,
+    onSetCustomImageDir: (String) -> Unit = {},
     onSetManualLux: (Float?) -> Unit,
     onSetDimImageScale: (Float) -> Unit,
     onSetShowImageInDim: (Boolean) -> Unit,
@@ -346,6 +356,7 @@ fun WatchFaceScreen(
                     onSetActiveTimeout = onSetActiveTimeout,
                     onSelectWallpaper = onSelectWallpaper,
                     onRefreshWallpapers = onRefreshWallpapers,
+                    onSetCustomImageDir = onSetCustomImageDir,
                     onSetManualLux = onSetManualLux,
                     onSetDimImageScale = onSetDimImageScale,
                     onSetShowImageInDim = onSetShowImageInDim,
@@ -367,6 +378,7 @@ fun WatchFaceSettingsContent(
     onSetActiveTimeout: (Long) -> Unit,
     onSelectWallpaper: (Int) -> Unit,
     onRefreshWallpapers: () -> Unit,
+    onSetCustomImageDir: (String) -> Unit = {},
     onSetManualLux: (Float?) -> Unit,
     onSetDimImageScale: (Float) -> Unit,
     onSetShowImageInDim: (Boolean) -> Unit,
@@ -375,6 +387,7 @@ fun WatchFaceSettingsContent(
     onClose: () -> Unit
 ) {
     val scrollState = rememberScrollState()
+    var pathInputText by remember(uiState.customImageDir) { mutableStateOf(uiState.customImageDir) }
 
     Column(
         modifier = Modifier
@@ -506,14 +519,14 @@ fun WatchFaceSettingsContent(
             }
         }
 
-        // Section 3: Wallpaper Rotation Mode & Picker
+        // Section 3: Wallpaper Rotation Mode, Custom Path & Picker
         Card(
             colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
             shape = RoundedCornerShape(12.dp)
         ) {
             Column(
                 modifier = Modifier.padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -524,7 +537,7 @@ fun WatchFaceSettingsContent(
                         Icon(Icons.Default.Palette, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "背景壁纸与轮换模式",
+                            text = "背景壁纸与轮换路径",
                             style = MaterialTheme.typography.labelLarge,
                             color = Color.White,
                             fontWeight = FontWeight.SemiBold
@@ -532,11 +545,17 @@ fun WatchFaceSettingsContent(
                     }
 
                     IconButton(onClick = onRefreshWallpapers) {
-                        Icon(Icons.Default.Refresh, contentDescription = "刷新外部目录", tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Refresh, contentDescription = "刷新扫描目录", tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp))
                     }
                 }
 
-                // Mode Chips
+                // 3.1: Rotation Mode Chips
+                Text(
+                    text = "轮换触发机制",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF94A3B8),
+                    fontWeight = FontWeight.Medium
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -556,9 +575,144 @@ fun WatchFaceSettingsContent(
                     }
                 }
 
-                // Wallpaper List
+                // 3.2: Custom Image Directory Path Selector (手动选择与配置轮换路径)
+                Surface(
+                    color = Color(0xFF0F172A),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.FolderOpen, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "手表内部存储路径 (无需物理SD卡)",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+
+                        Text(
+                            text = "说明：Android 系统中 /sdcard 与 /storage/emulated/0 均为手表机身内置闪存的虚拟软链接别名。点击下方内置存储目录即可快速切换：",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF94A3B8)
+                        )
+
+                        // Quick preset path chips
+                        val presetPaths = listOf(
+                            "/sdcard/WatchFace" to "内置存储专用目录 (/sdcard)",
+                            "/storage/emulated/0/WatchFace" to "内置主存储绝对路径 (emulated/0)",
+                            "/sdcard/Pictures/WatchFace" to "内置 Pictures/WatchFace",
+                            "/sdcard/Pictures" to "内置 Pictures 图片相册",
+                            "/sdcard/Download" to "内置 Download 下载目录",
+                            "/sdcard/DCIM" to "内置 DCIM 媒体目录"
+                        )
+
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            presetPaths.forEach { (path, label) ->
+                                val isCur = uiState.customImageDir.trimEnd('/') == path.trimEnd('/')
+                                Surface(
+                                    onClick = {
+                                        pathInputText = path
+                                        onSetCustomImageDir(path)
+                                    },
+                                    color = if (isCur) Color(0xFF0369A1) else Color(0xFF1E293B),
+                                    shape = RoundedCornerShape(6.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = path,
+                                            fontSize = 11.sp,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = if (isCur) Color.White else Color(0xFFE2E8F0)
+                                        )
+                                        Text(
+                                            text = label,
+                                            fontSize = 10.sp,
+                                            color = if (isCur) Color(0xFFBAE6FD) else Color(0xFF94A3B8)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Custom path input row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = pathInputText,
+                                onValueChange = { pathInputText = it },
+                                label = { Text("自定义路径", fontSize = 11.sp) },
+                                singleLine = true,
+                                textStyle = TextStyle(fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = Color.White),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Color(0xFF38BDF8),
+                                    unfocusedBorderColor = Color(0xFF475569),
+                                    focusedLabelColor = Color(0xFF38BDF8),
+                                    unfocusedLabelColor = Color(0xFF94A3B8),
+                                    cursorColor = Color(0xFF38BDF8)
+                                ),
+                                modifier = Modifier.weight(1f)
+                            )
+
+                            Button(
+                                onClick = {
+                                    if (pathInputText.isNotBlank()) {
+                                        onSetCustomImageDir(pathInputText.trim())
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.height(52.dp)
+                            ) {
+                                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("应用", fontSize = 11.sp)
+                            }
+                        }
+
+                        // Path Scan Status
+                        Surface(
+                            color = if (uiState.dirExists && uiState.dirImageCount > 0) Color(0xFF064E3B) else Color(0xFF451A03),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (uiState.dirExists && uiState.dirImageCount > 0) {
+                                        "🟢 路径已生效 · 成功扫描到 ${uiState.dirImageCount} 张内置存储图片"
+                                    } else if (uiState.dirExists) {
+                                        "🟡 目录存在但无图片文件 · 自动使用 5 款内置高清壁纸"
+                                    } else {
+                                        "⚠️ 文件夹尚未创建 (传输图片后自动创建) · 自动使用内置预设"
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontSize = 11.sp,
+                                    color = if (uiState.dirExists && uiState.dirImageCount > 0) Color(0xFFA7F3D0) else Color(0xFFFDE68A)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // 3.3: Available Wallpapers List & Preview
                 Text(
-                    text = "当前壁纸: ${uiState.currentWallpaper?.title ?: "无"}",
+                    text = "壁纸列表与即时选择 (共 ${uiState.allWallpapers.size} 张)：",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color(0xFFCBD5E1)
                 )
@@ -583,7 +737,7 @@ fun WatchFaceSettingsContent(
                                     color = if (isSelected) Color.White else Color(0xFFE2E8F0)
                                 )
                                 Text(
-                                    text = if (wp.isExternal) "/sdcard/WatchFace" else "内置预设",
+                                    text = if (wp.isExternal) "手表机身存储" else "系统内置",
                                     fontSize = 10.sp,
                                     color = if (isSelected) Color(0xFFBAE6FD) else Color(0xFF94A3B8)
                                 )

@@ -8,8 +8,10 @@
 
 ### 1. 🖼️ 全彩高清壁纸与自定义导入
 - **内置 5 款精选 AMOLED 预设壁纸**：深空星云、极光夜空、暮色沙丘、暗晶多面、赛博霓虹。
-- **自定义本地壁纸导入**：
-  - 自动扫描手表内部存储路径：`/sdcard/WatchFace` 与 `/sdcard/Pictures/WatchFace`。
+- **自定义本地壁纸导入与自由路径选择**：
+  - **无需物理 SD 卡**：Android / ColorOS Watch 系统中 `/sdcard` 与 `/storage/emulated/0` 是机身内置闪存（Internal Flash Storage）的标准化主挂载点别名。
+  - **支持设置内手动选择/输入存储路径**：在长按抽屉设置面板中，可一键切换常用快捷路径（`/sdcard/WatchFace`、`/storage/emulated/0/WatchFace`、`/sdcard/Pictures/WatchFace`、`/sdcard/Pictures`、`/sdcard/Download`、`/sdcard/DCIM`），或直接手动输入任意机身文件夹绝对路径。
+  - **实时目录检测与图片统计**：即时显示当前路径是否有效及扫描到的图片数量。
   - 支持 `.jpg`、`.jpeg`、`.png`、`.webp` 等常见图片格式。
   - 采用亚采样与硬件位图加载技术，无内存泄漏与 GC 顿挫。
 - **平滑淡入淡出动画 (Crossfade)**：切换壁纸时具备 350ms GPU 硬件加速交叉渐变，视觉体验丝滑。

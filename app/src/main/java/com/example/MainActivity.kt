@@ -43,6 +43,7 @@ class MainActivity : ComponentActivity() {
                     onSetActiveTimeout = { timeoutMs -> viewModel.setActiveTimeout(timeoutMs) },
                     onSelectWallpaper = { index -> viewModel.selectWallpaperIndex(index) },
                     onRefreshWallpapers = { viewModel.refreshWallpapers() },
+                    onSetCustomImageDir = { path -> viewModel.setCustomImageDir(path) },
                     onSetManualLux = { lux -> viewModel.setManualLuxOverride(lux) },
                     onSetDimImageScale = { scale -> viewModel.setDimImageScale(scale) },
                     onSetShowImageInDim = { enabled -> viewModel.setShowImageInDim(enabled) },

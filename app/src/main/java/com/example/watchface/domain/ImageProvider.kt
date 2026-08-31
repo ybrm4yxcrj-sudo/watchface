@@ -29,6 +29,7 @@ class ImageProvider(
     private var rotationMode = ImageRotationMode.ON_WAKE
     private var currentWallpaperList: List<WatchWallpaper> = emptyList()
     private var currentActiveIndex = 0
+    private var currentDirectory: String = Config.IMAGE_DIR
 
     // Memory-safe LRU Cache (max 3 bitmaps ~ 1.2MB total in RGB_565)
     private val bitmapCache = object : LruCache<String, Bitmap>(Config.IMAGE_CACHE_SIZE) {
@@ -73,10 +74,36 @@ class ImageProvider(
         )
     )
 
-    fun refreshWallpapers(externalDir: String = Config.IMAGE_DIR): List<WatchWallpaper> {
+    fun setDirectory(dirPath: String) {
+        currentDirectory = dirPath.trim()
+        bitmapCache.evictAll()
+    }
+
+    fun getDirectory(): String = currentDirectory
+
+    /**
+     * Check if directory exists and return count of valid image files found
+     */
+    fun scanDirectoryStats(dirPath: String = currentDirectory): Pair<Int, Boolean> {
+        try {
+            val dir = File(dirPath.trim())
+            if (!dir.exists()) return Pair(0, false)
+            if (!dir.isDirectory) return Pair(0, false)
+            val files = dir.listFiles { file ->
+                val name = file.name.lowercase()
+                name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") || name.endsWith(".webp")
+            }
+            return Pair(files?.size ?: 0, true)
+        } catch (_: Exception) {
+            return Pair(0, false)
+        }
+    }
+
+    fun refreshWallpapers(externalDir: String = currentDirectory): List<WatchWallpaper> {
+        currentDirectory = externalDir.trim()
         val list = mutableListOf<WatchWallpaper>()
         try {
-            val dir = File(externalDir)
+            val dir = File(currentDirectory)
             if (dir.exists() && dir.isDirectory) {
                 val files = dir.listFiles { file ->
                     val name = file.name.lowercase()
@@ -95,13 +122,8 @@ class ImageProvider(
             }
         } catch (_: Exception) { }
 
-        // Fallback to presets if external dir has no images
-        if (list.isEmpty()) {
-            list.addAll(fallbackWallpapers)
-        } else {
-            // Also append presets for user testing
-            list.addAll(fallbackWallpapers)
-        }
+        // Always include built-in high-quality presets so users have a rich collection
+        list.addAll(fallbackWallpapers)
 
         currentWallpaperList = list
         return list
