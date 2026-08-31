@@ -45,9 +45,9 @@ object Config {
     const val LUX_ROOM_MAX = 200f
     const val LUX_HYSTERESIS = 0.20f // ±20% buffer
 
-    // Accelerometer wake thresholds
-    const val MOTION_THRESHOLD = 3.0f // Magnitude deviation from 9.81 m/s^2
-    const val WAKE_COOLDOWN_MS = 3_000L
+    // Accelerometer wake thresholds (Optimized for low power & deliberate gestures)
+    const val MOTION_THRESHOLD = 5.8f // Higher magnitude threshold to filter out inadvertent arm swings
+    const val WAKE_COOLDOWN_MS = 4_000L
 
     // Default watch storage directory
     const val IMAGE_DIR = "/sdcard/WatchFace"

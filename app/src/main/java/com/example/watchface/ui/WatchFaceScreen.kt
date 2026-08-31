@@ -248,7 +248,7 @@ fun WatchFaceScreen(
                 )
         )
 
-        // 4. Content Root with adaptive sizing: Battery at Top-Right, Time & Date at Bottom
+        // 4. Content Root with adaptive sizing: Time, Date & Battery at Bottom
         val burnInX = uiState.burnInOffset.offsetX
         val burnInY = uiState.burnInOffset.offsetY
 
@@ -256,62 +256,14 @@ fun WatchFaceScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .offset { IntOffset(burnInX.roundToInt(), burnInY.roundToInt()) }
-                .padding(horizontal = 10.dp, vertical = 10.dp)
+                .padding(horizontal = 10.dp, vertical = 8.dp)
                 .testTag("watchface_content_root")
         ) {
             val screenWidth = maxWidth
-            val timeFontSize = (screenWidth.value * 0.175f).coerceIn(30f, 44f).sp
-            val dateFontSize = (screenWidth.value * 0.052f).coerceIn(12f, 15f).sp
+            val timeFontSize = (screenWidth.value * 0.22f).coerceIn(38f, 56f).sp
+            val dateFontSize = (screenWidth.value * 0.055f).coerceIn(13f, 16f).sp
 
-            // Top-Right Battery Status Indicator (Smaller font, top-right aligned)
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.End,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 4.dp, end = 6.dp)
-                    .background(
-                        color = Color.Black.copy(alpha = 0.30f),
-                        shape = RoundedCornerShape(10.dp)
-                    )
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                    .testTag("battery_status_row")
-            ) {
-                val batteryPct = uiState.timeSnapshot.batteryPct
-                val batteryColor = when {
-                    batteryPct <= 20 -> Color(0xFFEF4444)
-                    batteryPct <= 50 -> Color(0xFFF59E0B)
-                    else -> Color(0xFF10B981)
-                }
-
-                Icon(
-                    imageVector = Icons.Default.BatteryFull,
-                    contentDescription = "电池电量",
-                    tint = batteryColor,
-                    modifier = Modifier.size(12.dp)
-                )
-
-                Spacer(modifier = Modifier.width(3.dp))
-
-                Text(
-                    text = "$batteryPct%",
-                    color = Color(0xFFE2E8F0),
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.SansSerif,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    softWrap = false,
-                    style = TextStyle(
-                        shadow = Shadow(
-                            color = Color.Black.copy(alpha = 0.95f),
-                            offset = Offset(0f, 1f),
-                            blurRadius = 6f
-                        )
-                    )
-                )
-            }
-
-            // Bottom-Center Time & Date Group (Smaller font, bottom positioned)
+            // Bottom-Center Time, Date & Battery Group
             val timeShiftX = uiState.burnInOffset.timeOffsetX
             val timeShiftY = uiState.burnInOffset.timeOffsetY
             val dateShiftX = uiState.burnInOffset.dateOffsetX
@@ -324,7 +276,7 @@ fun WatchFaceScreen(
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 6.dp)
             ) {
-                // Main Digital Clock (Smaller font at bottom, clean HH:mm display)
+                // Main Digital Clock (Larger font, bold clean display)
                 Text(
                     text = uiState.timeSnapshot.timeText,
                     color = Color.White,
@@ -339,7 +291,7 @@ fun WatchFaceScreen(
                         shadow = Shadow(
                             color = Color.Black.copy(alpha = 0.95f),
                             offset = Offset(0f, 2f),
-                            blurRadius = 12f
+                            blurRadius = 14f
                         )
                     ),
                     modifier = Modifier
@@ -370,6 +322,53 @@ fun WatchFaceScreen(
                         .padding(top = 1.dp)
                         .testTag("date_text")
                 )
+
+                // Battery Status Indicator (Positioned below Date and Time)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .background(
+                            color = Color.Black.copy(alpha = 0.35f),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                        .padding(horizontal = 7.dp, vertical = 2.dp)
+                        .testTag("battery_status_row")
+                ) {
+                    val batteryPct = uiState.timeSnapshot.batteryPct
+                    val batteryColor = when {
+                        batteryPct <= 20 -> Color(0xFFEF4444)
+                        batteryPct <= 50 -> Color(0xFFF59E0B)
+                        else -> Color(0xFF10B981)
+                    }
+
+                    Icon(
+                        imageVector = Icons.Default.BatteryFull,
+                        contentDescription = "电池电量",
+                        tint = batteryColor,
+                        modifier = Modifier.size(13.dp)
+                    )
+
+                    Spacer(modifier = Modifier.width(3.dp))
+
+                    Text(
+                        text = "$batteryPct%",
+                        color = Color(0xFFE2E8F0),
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.SansSerif,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        softWrap = false,
+                        style = TextStyle(
+                            shadow = Shadow(
+                                color = Color.Black.copy(alpha = 0.95f),
+                                offset = Offset(0f, 1f),
+                                blurRadius = 6f
+                            )
+                        )
+                    )
+                }
 
                 // Unread Notification Red Dot Indicator (Bottom Center, pulsing breathing glow)
                 if (uiState.isNotificationDotEnabled && uiState.hasUnreadNotifications) {

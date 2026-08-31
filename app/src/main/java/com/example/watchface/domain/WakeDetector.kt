@@ -43,8 +43,9 @@ class WakeDetector(
 
     fun startListening() {
         if (isRegistered || sensorManager == null) return
+        // Use SENSOR_DELAY_UI for accelerometer (60ms) and SENSOR_DELAY_NORMAL (200ms) for light
         accelerometer?.let {
-            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
+            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
         }
         lightSensor?.let {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
@@ -55,7 +56,7 @@ class WakeDetector(
     fun setDimState(isDim: Boolean) {
         if (!isRegistered || sensorManager == null) return
         if (isDim) {
-            // Unregister light sensor in DIM to save battery, keep accelerometer for wake
+            // Unregister light sensor completely in DIM mode to reduce CPU wakeups
             lightSensor?.let { sensorManager.unregisterListener(this, it) }
         } else {
             // Re-register light sensor in ACTIVE mode
@@ -85,6 +86,12 @@ class WakeDetector(
                 onLuxChanged(currentSmoothedLux, rawLux)
             }
             Sensor.TYPE_ACCELEROMETER -> {
+                val now = SystemClock.elapsedRealtime()
+                // Throttle processing if we are in cooldown window to save CPU cycles
+                if (now - lastWakeTime < Config.WAKE_COOLDOWN_MS) {
+                    return
+                }
+
                 val x = event.values[0]
                 val y = event.values[1]
                 val z = event.values[2]
@@ -101,37 +108,32 @@ class WakeDetector(
                     gravity[2] = alpha * gravity[2] + (1 - alpha) * z
                 }
 
-                // 1. Motion magnitude wake (v1粗糙版)
+                // Magnitude deviation from gravity (9.81 m/s^2)
                 val mag = sqrt(x * x + y * y + z * z)
                 val magDev = abs(mag - 9.81f)
 
-                // 2. Pitch angle computation (v2精确抬腕判定)
-                // pitch = atan2(-gx, sqrt(gy^2 + gz^2)) * 180 / PI
+                // Pitch angle computation for wrist-raise
                 val pitch = (atan2(-gravity[0].toDouble(), sqrt((gravity[1] * gravity[1] + gravity[2] * gravity[2]).toDouble())) * 180.0 / Math.PI).toFloat()
 
                 onMotionTelemetry(pitch, magDev)
 
-                val now = SystemClock.elapsedRealtime()
-                if (now - lastWakeTime < Config.WAKE_COOLDOWN_MS) {
-                    lastPitch = pitch
-                    return
-                }
-
-                // Check wrist raise gesture:
-                // Arms down (pitch < -40°), then turned towards face within 1.2s (-20° <= pitch <= 45°)
-                if (pitch < -40f) {
+                // Precise & Low-Power Wrist Raise Logic:
+                // Must start from a lower resting angle (pitch < -45°), then explicitly rotate to reading angle (-15° <= pitch <= 35°) within 1.0 second
+                if (pitch < -45f) {
                     wasLookingDown = true
                     lookDownTimestamp = now
-                } else if (wasLookingDown && (now - lookDownTimestamp <= 1200L)) {
-                    if (pitch in -20f..45f) {
+                } else if (wasLookingDown && (now - lookDownTimestamp in 150L..1000L)) {
+                    if (pitch in -15f..35f) {
                         wasLookingDown = false
                         lastWakeTime = now
                         onWakeRequest("抬腕手势")
                         return
                     }
+                } else if (now - lookDownTimestamp > 1000L) {
+                    wasLookingDown = false
                 }
 
-                // Fallback: Sudden motion threshold
+                // Filtered fallback: only trigger on strong deliberate shake / movement, not casual arm swinging
                 if (magDev > Config.MOTION_THRESHOLD) {
                     lastWakeTime = now
                     onWakeRequest("动态感应")
