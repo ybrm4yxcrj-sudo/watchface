@@ -307,23 +307,7 @@ fun WatchFaceScreen(
                 )
             }
 
-            // Bottom Battery & Status Bar (With charging pulse & indicator)
-            val isCharging = uiState.timeSnapshot.isCharging
-            val infiniteTransition = rememberInfiniteTransition(label = "battery_charge_pulse")
-            val chargeAlpha = if (isCharging) {
-                infiniteTransition.animateFloat(
-                    initialValue = 0.45f,
-                    targetValue = 1.0f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(durationMillis = 900, easing = FastOutSlowInEasing),
-                        repeatMode = RepeatMode.Reverse
-                    ),
-                    label = "charge_pulse_alpha"
-                ).value
-            } else {
-                1.0f
-            }
-
+            // Bottom Battery & Status Bar - Clean battery display
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
@@ -333,24 +317,23 @@ fun WatchFaceScreen(
             ) {
                 val batteryPct = uiState.timeSnapshot.batteryPct
                 val batteryColor = when {
-                    isCharging -> Color(0xFF34D399) // Charging Green
                     batteryPct <= 20 -> Color(0xFFEF4444)
                     batteryPct <= 50 -> Color(0xFFF59E0B)
                     else -> Color(0xFF10B981)
                 }
 
                 Icon(
-                    imageVector = if (isCharging) Icons.Default.Bolt else Icons.Default.BatteryFull,
-                    contentDescription = if (isCharging) "充电中" else "电池电量",
-                    tint = batteryColor.copy(alpha = chargeAlpha),
+                    imageVector = Icons.Default.BatteryFull,
+                    contentDescription = "电池电量",
+                    tint = batteryColor,
                     modifier = Modifier.size(16.dp)
                 )
 
                 Spacer(modifier = Modifier.width(4.dp))
 
                 Text(
-                    text = if (isCharging) "$batteryPct% ⚡" else "$batteryPct%",
-                    color = if (isCharging) Color(0xFFA7F3D0).copy(alpha = chargeAlpha) else Color(0xFFE2E8F0),
+                    text = "$batteryPct%",
+                    color = Color(0xFFE2E8F0),
                     fontSize = 14.sp,
                     fontFamily = FontFamily.SansSerif,
                     fontWeight = FontWeight.Medium,

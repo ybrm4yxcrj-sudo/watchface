@@ -43,13 +43,31 @@ class ImageProvider(
     private val fallbackWallpapers = listOf(
         WatchWallpaper(
             id = "preset_space",
-            title = "深空星云 (AMOLED Preset)",
+            title = "深空星云 (AMOLED Nebula)",
             isExternal = false,
             drawableRes = R.drawable.watch_bg_space_1788157274537
         ),
         WatchWallpaper(
+            id = "preset_aurora",
+            title = "极光夜空 (Arctic Aurora)",
+            isExternal = false,
+            drawableRes = R.drawable.watch_bg_aurora_1788165103087
+        ),
+        WatchWallpaper(
+            id = "preset_sunset_dune",
+            title = "暮色沙丘 (Dusk Horizon)",
+            isExternal = false,
+            drawableRes = R.drawable.watch_bg_sunset_dune_1788165113666
+        ),
+        WatchWallpaper(
+            id = "preset_geo_dark",
+            title = "暗晶多面 (Dark Crystal)",
+            isExternal = false,
+            drawableRes = R.drawable.watch_bg_geo_dark_1788165125954
+        ),
+        WatchWallpaper(
             id = "preset_cyber",
-            title = "赛博霓虹 (Cyber Preset)",
+            title = "赛博霓虹 (Cyber Glow)",
             isExternal = false,
             drawableRes = R.drawable.watch_bg_cyber_1788157287366
         )
