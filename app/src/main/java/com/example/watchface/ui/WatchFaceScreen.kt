@@ -104,6 +104,8 @@ fun WatchFaceScreen(
     onSetManualLux: (Float?) -> Unit,
     onSetDimImageScale: (Float) -> Unit,
     onSetShowImageInDim: (Boolean) -> Unit,
+    onSetBurnInPixelShift: (Boolean) -> Unit = {},
+    onSetCircadianBrightness: (Boolean) -> Unit = {},
     onToggleSettings: (Boolean?) -> Unit
 ) {
     val isDim = uiState.state == WatchFaceState.DIM
@@ -157,6 +159,7 @@ fun WatchFaceScreen(
                     bitmap = imageBitmap,
                     contentDescription = "Watch Face Wallpaper",
                     contentScale = ContentScale.Crop,
+                    colorFilter = imageColorFilter,
                     modifier = Modifier
                         .fillMaxSize()
                         .testTag("wallpaper_image")
@@ -177,7 +180,16 @@ fun WatchFaceScreen(
             }
         }
 
-        // 2. High-contrast ambient readability scrim for time & complications
+        // 2. Dynamic AMOLED Dim overlay layer (Smoothly animated by BrightnessController)
+        if (uiState.overlayAlpha > 0.005f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = uiState.overlayAlpha.coerceIn(0f, 0.90f)))
+            )
+        }
+
+        // 3. High-contrast ambient readability scrim for time & complications
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -191,7 +203,7 @@ fun WatchFaceScreen(
                 )
         )
 
-        // 3. Content Root with adaptive sizing to fit any watch screen width perfectly
+        // 4. Content Root with adaptive sizing to fit any watch screen width perfectly
         val burnInX = uiState.burnInOffset.offsetX
         val burnInY = uiState.burnInOffset.offsetY
 
@@ -216,6 +228,11 @@ fun WatchFaceScreen(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 // Time & Date Group (Centered, guaranteed single line, no overflow)
+                val timeShiftX = uiState.burnInOffset.timeOffsetX
+                val timeShiftY = uiState.burnInOffset.timeOffsetY
+                val dateShiftX = uiState.burnInOffset.dateOffsetX
+                val dateShiftY = uiState.burnInOffset.dateOffsetY
+
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
@@ -239,10 +256,12 @@ fun WatchFaceScreen(
                                 blurRadius = 16f
                             )
                         ),
-                        modifier = Modifier.testTag("time_main_text")
+                        modifier = Modifier
+                            .offset { IntOffset(timeShiftX.roundToInt(), timeShiftY.roundToInt()) }
+                            .testTag("time_main_text")
                     )
 
-                    // Date & Weekday Text
+                    // Date & Weekday Text with micro-phase sub-pixel shift
                     Text(
                         text = uiState.timeSnapshot.dateText,
                         color = Color(0xFFF1F5F9),
@@ -261,6 +280,7 @@ fun WatchFaceScreen(
                             )
                         ),
                         modifier = Modifier
+                            .offset { IntOffset(dateShiftX.roundToInt(), dateShiftY.roundToInt()) }
                             .padding(top = 4.dp)
                             .testTag("date_text")
                     )
@@ -329,6 +349,8 @@ fun WatchFaceScreen(
                     onSetManualLux = onSetManualLux,
                     onSetDimImageScale = onSetDimImageScale,
                     onSetShowImageInDim = onSetShowImageInDim,
+                    onSetBurnInPixelShift = onSetBurnInPixelShift,
+                    onSetCircadianBrightness = onSetCircadianBrightness,
                     onClose = { onToggleSettings(false) }
                 )
             }
@@ -348,6 +370,8 @@ fun WatchFaceSettingsContent(
     onSetManualLux: (Float?) -> Unit,
     onSetDimImageScale: (Float) -> Unit,
     onSetShowImageInDim: (Boolean) -> Unit,
+    onSetBurnInPixelShift: (Boolean) -> Unit = {},
+    onSetCircadianBrightness: (Boolean) -> Unit = {},
     onClose: () -> Unit
 ) {
     val scrollState = rememberScrollState()
@@ -708,41 +732,152 @@ fun WatchFaceSettingsContent(
             }
         }
 
-        // Section 5: AMOLED Burn-In & Diagnostics
+        // Section 6: OLED Burn-In Guard & Pixel Shifting (防烧屏像素微偏移)
         Card(
             colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
             shape = RoundedCornerShape(12.dp)
         ) {
             Column(
                 modifier = Modifier.padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Info, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "AMOLED 防烧屏与传感器监控",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Color.White,
-                        fontWeight = FontWeight.SemiBold
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Info, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "防烧屏像素微偏移 (Pixel Shifting)",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    Switch(
+                        checked = uiState.isBurnInPixelShiftEnabled,
+                        onCheckedChange = { onSetBurnInPixelShift(it) },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Color(0xFF0284C7),
+                            uncheckedThumbColor = Color(0xFF94A3B8),
+                            uncheckedTrackColor = Color(0xFF334155)
+                        )
                     )
                 }
 
                 Text(
-                    text = "• 像素偏移: dx=${String.format("%.1f", uiState.burnInOffset.offsetX)}px, dy=${String.format("%.1f", uiState.burnInOffset.offsetY)}px (周期步数: ${uiState.burnInOffset.step % 60}/60)",
+                    text = "采用 2D 李萨如空间填充曲线 (3:4) 与子像素微抖动算法，每分钟平滑平移，时间与日期独立错相漂移，彻底消除 AMOLED 固定像素点老化。",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFFCBD5E1)
+                    color = Color(0xFF94A3B8)
                 )
+
+                Surface(
+                    color = Color(0xFF0F172A),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "• 全局偏移: dx=${String.format("%.1f", uiState.burnInOffset.offsetX)}px, dy=${String.format("%.1f", uiState.burnInOffset.offsetY)}px (周期步数: ${uiState.burnInOffset.step % 120}/120)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF38BDF8)
+                        )
+                        Text(
+                            text = "• 时间子项偏移: dx=${String.format("%.1f", uiState.burnInOffset.timeOffsetX)}px, dy=${String.format("%.1f", uiState.burnInOffset.timeOffsetY)}px",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFCBD5E1)
+                        )
+                        Text(
+                            text = "• 日期子项偏移: dx=${String.format("%.1f", uiState.burnInOffset.dateOffsetX)}px, dy=${String.format("%.1f", uiState.burnInOffset.dateOffsetY)}px",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFCBD5E1)
+                        )
+                        Text(
+                            text = "• 算法状态: ${uiState.burnInOffset.algorithmName}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF10B981)
+                        )
+                    }
+                }
+            }
+        }
+
+        // Section 7: Circadian Diurnal Auto-Brightness (随时间自动昼夜调光)
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.WbSunny, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "全局亮度随时间自动调整",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    Switch(
+                        checked = uiState.isCircadianBrightnessEnabled,
+                        onCheckedChange = { onSetCircadianBrightness(it) },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Color(0xFF0284C7),
+                            uncheckedThumbColor = Color(0xFF94A3B8),
+                            uncheckedTrackColor = Color(0xFF334155)
+                        )
+                    )
+                }
+
                 Text(
-                    text = "• 加速度计俯仰角: ${String.format("%.1f", uiState.pitchAngle)}° | 运动模长差: ${String.format("%.2f", uiState.motionMagnitudeDev)} m/s²",
+                    text = "结合 24 小时生物节律与环境光双重联动：深夜 (23:00-05:30) 自动降低亮度至 45% 深度护眼并加倍保护 OLED 发光像素；清晨与日落平滑升降；白天维持 100% 充沛可视度。",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFFCBD5E1)
+                    color = Color(0xFF94A3B8)
                 )
-                Text(
-                    text = "• 内存安全: 2-Pass Sampled RGB_565 (每张仅 ~383KB, LRU 限制 3 张)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF10B981)
-                )
+
+                Surface(
+                    color = Color(0xFF0F172A),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "• 当前时段: ${uiState.circadianProfile.periodName} (${uiState.circadianProfile.description})",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFF59E0B)
+                        )
+                        Text(
+                            text = "• 昼夜调光系数: ${(uiState.circadianProfile.circadianFactor * 100).toInt()}%",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFCBD5E1)
+                        )
+                        Text(
+                            text = "• 加速度计: 俯仰 ${String.format("%.1f", uiState.pitchAngle)}° | 运动模长 ${String.format("%.2f", uiState.motionMagnitudeDev)} m/s²",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF94A3B8)
+                        )
+                    }
+                }
             }
         }
 

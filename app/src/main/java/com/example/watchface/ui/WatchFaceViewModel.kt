@@ -12,6 +12,7 @@ import com.example.watchface.data.WatchFaceState
 import com.example.watchface.domain.BrightnessController
 import com.example.watchface.domain.BurnInGuard
 import com.example.watchface.domain.BurnInOffset
+import com.example.watchface.domain.CircadianProfile
 import com.example.watchface.domain.ImageProvider
 import com.example.watchface.domain.TimeSnapshot
 import com.example.watchface.domain.TimeTicker
@@ -37,7 +38,10 @@ data class WatchFaceUiState(
     val rawLux: Float = 50f,
     val smoothedLux: Float = 50f,
     val luxTier: LuxTier = LuxTier.ROOM,
-    val burnInOffset: BurnInOffset = BurnInOffset(0f, 0f, 0),
+    val burnInOffset: BurnInOffset = BurnInOffset(),
+    val isBurnInPixelShiftEnabled: Boolean = true,
+    val isCircadianBrightnessEnabled: Boolean = true,
+    val circadianProfile: CircadianProfile = CircadianProfile(),
     val activeTimeoutMs: Long = Config.ACTIVE_TIMEOUT_MS,
     val isSettingsOpen: Boolean = false,
     val lastWakeReason: String = "启动初始化",
@@ -77,17 +81,26 @@ class WatchFaceViewModel : ViewModel() {
         val savedScale = sharedPrefs?.getFloat("pref_dim_scale", Config.IMAGE_DIM_SCALE) ?: Config.IMAGE_DIM_SCALE
         val savedShowDim = sharedPrefs?.getBoolean("pref_show_dim_img", true) ?: true
         val savedIndex = sharedPrefs?.getInt("pref_wallpaper_index", 0) ?: 0
+        val savedPixelShift = sharedPrefs?.getBoolean("pref_pixel_shift", true) ?: true
+        val savedCircadian = sharedPrefs?.getBoolean("pref_circadian_brightness", true) ?: true
+
+        burnInGuard.setEnabled(savedPixelShift)
+
+        brightnessController = BrightnessController(activity)
+        val initialCircadian = brightnessController!!.calculateCircadianProfile(10, 32)
 
         _uiState.update {
             it.copy(
                 rotationMode = savedMode,
                 activeTimeoutMs = savedTimeout,
                 dimImageScale = savedScale,
-                showImageInDim = savedShowDim
+                showImageInDim = savedShowDim,
+                isBurnInPixelShiftEnabled = savedPixelShift,
+                isCircadianBrightnessEnabled = savedCircadian,
+                circadianProfile = initialCircadian
             )
         }
 
-        brightnessController = BrightnessController(activity)
         imageProvider = ImageProvider(appContext).apply {
             setRotationMode(savedMode)
         }
@@ -140,10 +153,15 @@ class WatchFaceViewModel : ViewModel() {
     private fun handleTimeTick(snapshot: TimeSnapshot) {
         val density = 1.0f
         val offset = if (_uiState.value.state == WatchFaceState.DIM) {
-            burnInGuard.getNextOffset(density)
+            burnInGuard.getNextOffset(density, _uiState.value.isBurnInPixelShiftEnabled)
         } else {
-            burnInGuard.getCurrentOffset(density)
+            burnInGuard.getCurrentOffset(density, _uiState.value.isBurnInPixelShiftEnabled)
         }
+
+        val circadian = brightnessController?.calculateCircadianProfile(
+            snapshot.hourOfDay,
+            snapshot.minuteOfHour
+        ) ?: CircadianProfile()
 
         // Check periodic wallpaper rotation (Hourly or 15m intervals)
         val shouldRotateHourly = _uiState.value.rotationMode == ImageRotationMode.HOURLY && snapshot.minuteOfHour == 0
@@ -162,8 +180,21 @@ class WatchFaceViewModel : ViewModel() {
         _uiState.update {
             it.copy(
                 timeSnapshot = snapshot,
-                burnInOffset = offset
+                burnInOffset = offset,
+                circadianProfile = circadian
             )
+        }
+
+        // If in DIM state, dynamically refresh dim overlay based on updated circadian profile
+        if (_uiState.value.state == WatchFaceState.DIM) {
+            brightnessController?.animateToState(
+                state = WatchFaceState.DIM,
+                tier = _uiState.value.luxTier,
+                circadianFactor = circadian.circadianFactor,
+                isCircadianEnabled = _uiState.value.isCircadianBrightnessEnabled
+            ) { alpha ->
+                _uiState.update { it.copy(overlayAlpha = alpha) }
+            }
         }
     }
 
@@ -181,7 +212,12 @@ class WatchFaceViewModel : ViewModel() {
 
         // If in DIM state, dynamically adjust dimming
         if (_uiState.value.state == WatchFaceState.DIM) {
-            brightnessController?.animateToState(WatchFaceState.DIM, tier) { alpha ->
+            brightnessController?.animateToState(
+                state = WatchFaceState.DIM,
+                tier = tier,
+                circadianFactor = _uiState.value.circadianProfile.circadianFactor,
+                isCircadianEnabled = _uiState.value.isCircadianBrightnessEnabled
+            ) { alpha ->
                 _uiState.update { it.copy(overlayAlpha = alpha) }
             }
         }
@@ -205,7 +241,12 @@ class WatchFaceViewModel : ViewModel() {
                 }
             }
 
-            brightnessController?.animateToState(WatchFaceState.ACTIVE, _uiState.value.luxTier) { alpha ->
+            brightnessController?.animateToState(
+                state = WatchFaceState.ACTIVE,
+                tier = _uiState.value.luxTier,
+                circadianFactor = _uiState.value.circadianProfile.circadianFactor,
+                isCircadianEnabled = _uiState.value.isCircadianBrightnessEnabled
+            ) { alpha ->
                 _uiState.update { it.copy(overlayAlpha = alpha) }
             }
         }
@@ -219,7 +260,12 @@ class WatchFaceViewModel : ViewModel() {
         timeTicker?.setState(WatchFaceState.DIM)
         wakeDetector?.setDimState(true)
 
-        brightnessController?.animateToState(WatchFaceState.DIM, _uiState.value.luxTier) { alpha ->
+        brightnessController?.animateToState(
+            state = WatchFaceState.DIM,
+            tier = _uiState.value.luxTier,
+            circadianFactor = _uiState.value.circadianProfile.circadianFactor,
+            isCircadianEnabled = _uiState.value.isCircadianBrightnessEnabled
+        ) { alpha ->
             _uiState.update { it.copy(overlayAlpha = alpha) }
         }
     }
@@ -242,6 +288,32 @@ class WatchFaceViewModel : ViewModel() {
         _uiState.update { it.copy(activeTimeoutMs = timeoutMs) }
         sharedPrefs?.edit()?.putLong("pref_active_timeout", timeoutMs)?.apply()
         resetDimTimer()
+    }
+
+    fun setBurnInPixelShiftEnabled(enabled: Boolean) {
+        burnInGuard.setEnabled(enabled)
+        _uiState.update {
+            it.copy(
+                isBurnInPixelShiftEnabled = enabled,
+                burnInOffset = burnInGuard.getCurrentOffset(1.0f, enabled)
+            )
+        }
+        sharedPrefs?.edit()?.putBoolean("pref_pixel_shift", enabled)?.apply()
+    }
+
+    fun setCircadianBrightnessEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(isCircadianBrightnessEnabled = enabled) }
+        sharedPrefs?.edit()?.putBoolean("pref_circadian_brightness", enabled)?.apply()
+        if (_uiState.value.state == WatchFaceState.DIM) {
+            brightnessController?.animateToState(
+                state = WatchFaceState.DIM,
+                tier = _uiState.value.luxTier,
+                circadianFactor = _uiState.value.circadianProfile.circadianFactor,
+                isCircadianEnabled = enabled
+            ) { alpha ->
+                _uiState.update { it.copy(overlayAlpha = alpha) }
+            }
+        }
     }
 
     fun nextWallpaper() {

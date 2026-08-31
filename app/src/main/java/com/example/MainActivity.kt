@@ -46,6 +46,8 @@ class MainActivity : ComponentActivity() {
                     onSetManualLux = { lux -> viewModel.setManualLuxOverride(lux) },
                     onSetDimImageScale = { scale -> viewModel.setDimImageScale(scale) },
                     onSetShowImageInDim = { enabled -> viewModel.setShowImageInDim(enabled) },
+                    onSetBurnInPixelShift = { enabled -> viewModel.setBurnInPixelShiftEnabled(enabled) },
+                    onSetCircadianBrightness = { enabled -> viewModel.setCircadianBrightnessEnabled(enabled) },
                     onToggleSettings = { open -> viewModel.toggleSettings(open) }
                 )
             }
