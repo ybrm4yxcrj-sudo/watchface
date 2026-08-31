@@ -64,3 +64,14 @@
 - **持久化**：SharedPreferences (自动保存用户配置)
 - **传感器**：SensorManager (Light Sensor + Accelerometer)
 - **图形渲染**：Android Bitmap 硬件解码 + Canvas / Crossfade Transitions
+
+---
+
+## 🔑 GitHub Actions 持续集成与固定签名说明
+
+为方便在手表上**直接覆盖更新安装**（避免出现 `签名不一致` 导致必须先卸载再安装），本项目的 GitHub Actions 自动化编译流程已固定使用统一签名：
+
+- **固化签名密钥**：项目中已内置固化的 Release 签名密钥（`release.keystore.base64`），每次 GitHub 触发编译打包生成的 Release APK 均具备**完全一致的数字签名证书**。
+- **平滑无缝覆盖安装**：后续更新或编译新版本时，直接在手表上安装新 APK 即可无缝覆盖升级，历史设置和配置完美保留。
+- **自定义私有密钥（可选）**：如果您希望使用自己的私有证书，可在 GitHub 仓库的 `Settings -> Secrets and variables -> Actions` 中配置 `KEYSTORE_BASE64`、`STORE_PASSWORD`、`KEY_ALIAS`、`KEY_PASSWORD`，CI 工作流会自动优先使用您的私有秘钥。
+

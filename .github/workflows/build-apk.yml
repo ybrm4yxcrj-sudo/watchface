@@ -37,25 +37,29 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "Using custom release keystore from secrets..."
+            echo "Using custom release keystore from GitHub Secrets..."
             echo "$KEYSTORE_BASE64" | base64 --decode > my-upload-key.jks
             echo "STORE_PASSWORD=$KEYSTORE_PASSWORD" >> $GITHUB_ENV
             echo "KEY_PASSWORD=$KEY_PASSWORD" >> $GITHUB_ENV
             echo "KEY_ALIAS=$KEY_ALIAS" >> $GITHUB_ENV
-          else
-            echo "No custom keystore found in secrets. Generating self-signed release keystore for CI build..."
-            keytool -genkey -v \
-              -keystore my-upload-key.jks \
-              -alias upload \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -storepass android \
-              -keypass android \
-              -dname "CN=WatchFace, OU=WatchFace, O=WatchFace, L=City, S=State, C=US"
+          elif [ -f release.keystore.base64 ]; then
+            echo "Using project persistent release keystore (ensures identical signature across all CI builds)..."
+            base64 --decode release.keystore.base64 > my-upload-key.jks
             echo "STORE_PASSWORD=android" >> $GITHUB_ENV
             echo "KEY_PASSWORD=android" >> $GITHUB_ENV
             echo "KEY_ALIAS=upload" >> $GITHUB_ENV
+          elif [ -f release.keystore ]; then
+            echo "Using release.keystore directly..."
+            cp release.keystore my-upload-key.jks
+            echo "STORE_PASSWORD=android" >> $GITHUB_ENV
+            echo "KEY_PASSWORD=android" >> $GITHUB_ENV
+            echo "KEY_ALIAS=upload" >> $GITHUB_ENV
+          else
+            echo "Decoding persistent debug keystore as fallback..."
+            base64 --decode debug.keystore.base64 > my-upload-key.jks
+            echo "STORE_PASSWORD=android" >> $GITHUB_ENV
+            echo "KEY_PASSWORD=android" >> $GITHUB_ENV
+            echo "KEY_ALIAS=androiddebugkey" >> $GITHUB_ENV
           fi
 
       - name: Build Release APK
