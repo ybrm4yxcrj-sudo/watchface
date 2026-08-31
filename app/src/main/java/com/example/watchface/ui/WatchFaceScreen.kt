@@ -191,160 +191,122 @@ fun WatchFaceScreen(
                 )
         )
 
-        // 3. Top Interactive HUD Badge (Tap to test settings/simulation)
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 22.dp, start = 16.dp, end = 16.dp)
-                .background(
-                    color = Color(0x66000000),
-                    shape = CircleShape
-                )
-                .combinedClickable(
-                    onClick = { onToggleSettings(true) }
-                )
-                .padding(horizontal = 10.dp, vertical = 4.dp)
-                .testTag("top_status_badge"),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            // State indicator dot
-            Box(
-                modifier = Modifier
-                    .size(7.dp)
-                    .background(
-                        color = if (isDim) Color(0xFF38BDF8) else Color(0xFF10B981),
-                        shape = CircleShape
-                    )
-            )
-
-            Text(
-                text = if (isDim) "DIM 常亮" else "ACTIVE 亮屏",
-                color = Color(0xFFE2E8F0),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Medium
-            )
-
-            Text(
-                text = "•",
-                color = Color(0xFF94A3B8),
-                fontSize = 10.sp
-            )
-
-            Text(
-                text = "${uiState.smoothedLux.roundToInt()}lx",
-                color = Color(0xFF38BDF8),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Normal
-            )
-
-            Icon(
-                imageVector = Icons.Default.Settings,
-                contentDescription = "设置",
-                tint = Color(0xFFCBD5E1),
-                modifier = Modifier.size(11.dp)
-            )
-        }
-
-        // 4. Content Root (Subject to AMOLED orbital anti-burn-in offset)
+        // 3. Content Root with adaptive sizing to fit any watch screen width perfectly
         val burnInX = uiState.burnInOffset.offsetX
         val burnInY = uiState.burnInOffset.offsetY
 
-        Column(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .offset { IntOffset(burnInX.roundToInt(), burnInY.roundToInt()) }
-                .padding(top = 20.dp, bottom = 20.dp, start = 16.dp, end = 16.dp)
+                .padding(horizontal = 12.dp, vertical = 14.dp)
                 .testTag("watchface_content_root"),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+            contentAlignment = Alignment.Center
         ) {
-            Spacer(modifier = Modifier.height(30.dp))
+            val screenWidth = maxWidth
+            val timeFontSize = (screenWidth.value * 0.24f).coerceIn(46f, 60f).sp
+            val dateFontSize = (screenWidth.value * 0.065f).coerceIn(13f, 16f).sp
 
-            // Time & Date Group (Aligned vertically around 0.60 screen height)
             Column(
+                modifier = Modifier.fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
-                // Main Digital Clock (Clean HH:mm display without seconds, ultra-readable drop shadow)
-                Text(
-                    text = uiState.timeSnapshot.timeText,
-                    color = Color.White,
-                    fontSize = 82.sp,
-                    fontFamily = FontFamily.SansSerif,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = (-1.5).sp,
-                    textAlign = TextAlign.Center,
-                    style = TextStyle(
-                        shadow = Shadow(
-                            color = Color.Black.copy(alpha = 0.92f),
-                            offset = Offset(0f, 4f),
-                            blurRadius = 16f
-                        )
-                    ),
-                    modifier = Modifier.testTag("time_main_text")
-                )
+                // Top discreet spacer or subtle ambient indicator
+                Spacer(modifier = Modifier.height(4.dp))
 
-                // Date & Weekday Text - Uniform styling in both states
-                Text(
-                    text = uiState.timeSnapshot.dateText,
-                    color = Color(0xFFF1F5F9),
-                    fontSize = 17.sp,
-                    fontFamily = FontFamily.SansSerif,
-                    fontWeight = FontWeight.Normal,
-                    letterSpacing = 0.5.sp,
-                    textAlign = TextAlign.Center,
-                    style = TextStyle(
-                        shadow = Shadow(
-                            color = Color.Black.copy(alpha = 0.95f),
-                            offset = Offset(0f, 2f),
-                            blurRadius = 10f
-                        )
-                    ),
-                    modifier = Modifier
-                        .padding(top = 2.dp)
-                        .testTag("date_text")
-                )
-            }
+                // Time & Date Group (Centered, guaranteed single line, no overflow)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                ) {
+                    // Main Digital Clock (Clean HH:mm display, maxLines = 1, softWrap = false)
+                    Text(
+                        text = uiState.timeSnapshot.timeText,
+                        color = Color.White,
+                        fontSize = timeFontSize,
+                        fontFamily = FontFamily.SansSerif,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = (-1.0).sp,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        softWrap = false,
+                        style = TextStyle(
+                            shadow = Shadow(
+                                color = Color.Black.copy(alpha = 0.95f),
+                                offset = Offset(0f, 4f),
+                                blurRadius = 16f
+                            )
+                        ),
+                        modifier = Modifier.testTag("time_main_text")
+                    )
 
-            // Bottom Battery & Status Bar - Clean battery display
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier
-                    .padding(bottom = 10.dp)
-                    .testTag("battery_status_row")
-            ) {
-                val batteryPct = uiState.timeSnapshot.batteryPct
-                val batteryColor = when {
-                    batteryPct <= 20 -> Color(0xFFEF4444)
-                    batteryPct <= 50 -> Color(0xFFF59E0B)
-                    else -> Color(0xFF10B981)
+                    // Date & Weekday Text
+                    Text(
+                        text = uiState.timeSnapshot.dateText,
+                        color = Color(0xFFF1F5F9),
+                        fontSize = dateFontSize,
+                        fontFamily = FontFamily.SansSerif,
+                        fontWeight = FontWeight.Normal,
+                        letterSpacing = 0.3.sp,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        softWrap = false,
+                        style = TextStyle(
+                            shadow = Shadow(
+                                color = Color.Black.copy(alpha = 0.95f),
+                                offset = Offset(0f, 2f),
+                                blurRadius = 10f
+                            )
+                        ),
+                        modifier = Modifier
+                            .padding(top = 4.dp)
+                            .testTag("date_text")
+                    )
                 }
 
-                Icon(
-                    imageVector = Icons.Default.BatteryFull,
-                    contentDescription = "电池电量",
-                    tint = batteryColor,
-                    modifier = Modifier.size(16.dp)
-                )
+                // Bottom Battery & Status Bar - Clean battery display
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier
+                        .padding(bottom = 6.dp)
+                        .testTag("battery_status_row")
+                ) {
+                    val batteryPct = uiState.timeSnapshot.batteryPct
+                    val batteryColor = when {
+                        batteryPct <= 20 -> Color(0xFFEF4444)
+                        batteryPct <= 50 -> Color(0xFFF59E0B)
+                        else -> Color(0xFF10B981)
+                    }
 
-                Spacer(modifier = Modifier.width(4.dp))
+                    Icon(
+                        imageVector = Icons.Default.BatteryFull,
+                        contentDescription = "电池电量",
+                        tint = batteryColor,
+                        modifier = Modifier.size(15.dp)
+                    )
 
-                Text(
-                    text = "$batteryPct%",
-                    color = Color(0xFFE2E8F0),
-                    fontSize = 14.sp,
-                    fontFamily = FontFamily.SansSerif,
-                    fontWeight = FontWeight.Medium,
-                    style = TextStyle(
-                        shadow = Shadow(
-                            color = Color.Black.copy(alpha = 0.95f),
-                            offset = Offset(0f, 2f),
-                            blurRadius = 8f
+                    Spacer(modifier = Modifier.width(4.dp))
+
+                    Text(
+                        text = "$batteryPct%",
+                        color = Color(0xFFE2E8F0),
+                        fontSize = 13.sp,
+                        fontFamily = FontFamily.SansSerif,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        softWrap = false,
+                        style = TextStyle(
+                            shadow = Shadow(
+                                color = Color.Black.copy(alpha = 0.95f),
+                                offset = Offset(0f, 2f),
+                                blurRadius = 8f
+                            )
                         )
                     )
-                )
+                }
             }
         }
 
