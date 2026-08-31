@@ -1,0 +1,6 @@
+{
+  "name": "OPPO Watch 2 表盘",
+  "description": "OPPO Watch 2 专享常亮表盘，支持全彩图片背景、自动压暗与防烧屏",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
