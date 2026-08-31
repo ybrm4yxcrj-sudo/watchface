@@ -35,8 +35,8 @@ class BrightnessController(private val activity: Activity) {
             t >= 23.0f || t < 5.5f -> {
                 CircadianProfile(
                     circadianFactor = Config.CIRCADIAN_NIGHT_FACTOR,
-                    periodName = "深夜深度护眼",
-                    description = "23:00 - 05:30 低功耗防烧屏 (45%亮度)"
+                    periodName = "深夜舒适护眼",
+                    description = "23:00 - 05:30 舒适护眼 (${(Config.CIRCADIAN_NIGHT_FACTOR * 100).toInt()}%亮度)"
                 )
             }
             // 05:30 - 08:30 清晨日出平滑升温
@@ -73,7 +73,7 @@ class BrightnessController(private val activity: Activity) {
                 val factor = Config.CIRCADIAN_DUSK_FACTOR - progress * (Config.CIRCADIAN_DUSK_FACTOR - Config.CIRCADIAN_NIGHT_FACTOR)
                 CircadianProfile(
                     circadianFactor = factor,
-                    periodName = "睡前微暗护眼",
+                    periodName = "睡前舒适护眼",
                     description = "21:00 - 23:00 入夜保护 (${(factor * 100).toInt()}%)"
                 )
             }
@@ -126,7 +126,7 @@ class BrightnessController(private val activity: Activity) {
         circadianFactor: Float = 1.0f,
         isCircadianEnabled: Boolean = true
     ): Pair<Float, Float> {
-        val effectiveCircadian = if (isCircadianEnabled) circadianFactor.coerceIn(0.35f, 1.0f) else 1.0f
+        val effectiveCircadian = if (isCircadianEnabled) circadianFactor.coerceIn(0.60f, 1.0f) else 1.0f
 
         if (state == WatchFaceState.ACTIVE) {
             // In ACTIVE mode, preserve bright and responsive screen
@@ -140,8 +140,8 @@ class BrightnessController(private val activity: Activity) {
             LuxTier.SUN -> Pair(Config.BRIGHTNESS_DIM_SUN, Config.OVERLAY_ALPHA_SUN)
         }
 
-        val targetBrightness = (baseBrightness * effectiveCircadian).coerceAtLeast(0.005f)
-        val targetAlpha = (baseAlpha + (1.0f - effectiveCircadian) * 0.25f).coerceIn(0f, 0.65f)
+        val targetBrightness = (baseBrightness * effectiveCircadian).coerceAtLeast(0.05f)
+        val targetAlpha = (baseAlpha + (1.0f - effectiveCircadian) * 0.10f).coerceIn(0f, 0.40f)
 
         return Pair(targetBrightness, targetAlpha)
     }

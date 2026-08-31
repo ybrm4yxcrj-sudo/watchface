@@ -54,7 +54,7 @@ class ExampleRobolectricTest {
         assertEquals(15_000L, Config.ACTIVE_TIMEOUT_MS)
         assertEquals(402, Config.SCREEN_WIDTH_PX)
         assertEquals(476, Config.SCREEN_HEIGHT_PX)
-        assertEquals(0.70f, Config.IMAGE_DIM_SCALE, 0.01f)
+        assertEquals(0.85f, Config.IMAGE_DIM_SCALE, 0.01f)
         assertEquals(3, Config.IMAGE_CACHE_SIZE)
     }
 

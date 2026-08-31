@@ -41,14 +41,17 @@ class WakeDetector(
     private var wasLookingDown = false
     private var lookDownTimestamp = 0L
 
+    private var lastProcessTimestamp = 0L
+
     fun startListening() {
         if (isRegistered || sensorManager == null) return
-        // Use SENSOR_DELAY_UI for accelerometer (60ms) and SENSOR_DELAY_NORMAL (200ms) for light
+        // Use SENSOR_DELAY_NORMAL (approx 200ms / 5Hz) with 200ms batching latency to allow hardware FIFO batching
+        // This significantly reduces CPU wake-ups in standby mode
         accelerometer?.let {
-            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
+            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL, 200_000)
         }
         lightSensor?.let {
-            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
+            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL, 500_000)
         }
         isRegistered = true
     }
@@ -56,12 +59,12 @@ class WakeDetector(
     fun setDimState(isDim: Boolean) {
         if (!isRegistered || sensorManager == null) return
         if (isDim) {
-            // Unregister light sensor completely in DIM mode to reduce CPU wakeups
+            // Unregister light sensor completely in DIM mode to minimize battery draw
             lightSensor?.let { sensorManager.unregisterListener(this, it) }
         } else {
-            // Re-register light sensor in ACTIVE mode
+            // Re-register light sensor in ACTIVE mode with batching
             lightSensor?.let {
-                sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
+                sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL, 500_000)
             }
         }
     }
@@ -91,6 +94,12 @@ class WakeDetector(
                 if (now - lastWakeTime < Config.WAKE_COOLDOWN_MS) {
                     return
                 }
+
+                // Minimum 100ms interval between sensor evaluations (10Hz max compute rate)
+                if (now - lastProcessTimestamp < 100L) {
+                    return
+                }
+                lastProcessTimestamp = now
 
                 val x = event.values[0]
                 val y = event.values[1]
