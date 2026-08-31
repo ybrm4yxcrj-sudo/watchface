@@ -27,7 +27,15 @@ class GreetingScreenshotTest {
     fun greeting_screenshot() {
         val testUiState = WatchFaceUiState(
             state = WatchFaceState.ACTIVE,
-            timeSnapshot = TimeSnapshot("10:32", ":45", "周一 8月31日", 78, 10, 32)
+            timeSnapshot = TimeSnapshot(
+                timeText = "10:32",
+                secondsText = ":45",
+                dateText = "周一 8月31日",
+                batteryPct = 78,
+                isCharging = false,
+                hourOfDay = 10,
+                minuteOfHour = 32
+            )
         )
 
         composeTestRule.setContent {

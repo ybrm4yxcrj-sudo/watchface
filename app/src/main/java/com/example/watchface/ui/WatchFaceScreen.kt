@@ -205,15 +205,15 @@ fun WatchFaceScreen(
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        0.0f to Color.Transparent,
-                        0.45f to Color.Transparent,
-                        0.70f to Color(0x77000000),
-                        1.0f to Color(0xCC000000)
+                        0.0f to Color(0x33000000),
+                        0.25f to Color.Transparent,
+                        0.60f to Color.Transparent,
+                        1.0f to Color(0xD9000000)
                     )
                 )
         )
 
-        // 4. Content Root with adaptive sizing to fit any watch screen width perfectly
+        // 4. Content Root with adaptive sizing: Battery at Top-Right, Time & Date at Bottom
         val burnInX = uiState.burnInOffset.offsetX
         val burnInY = uiState.burnInOffset.offsetY
 
@@ -221,122 +221,120 @@ fun WatchFaceScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .offset { IntOffset(burnInX.roundToInt(), burnInY.roundToInt()) }
-                .padding(horizontal = 12.dp, vertical = 14.dp)
-                .testTag("watchface_content_root"),
-            contentAlignment = Alignment.Center
+                .padding(horizontal = 10.dp, vertical = 10.dp)
+                .testTag("watchface_content_root")
         ) {
             val screenWidth = maxWidth
-            val timeFontSize = (screenWidth.value * 0.24f).coerceIn(46f, 60f).sp
-            val dateFontSize = (screenWidth.value * 0.065f).coerceIn(13f, 16f).sp
+            val timeFontSize = (screenWidth.value * 0.135f).coerceIn(24f, 32f).sp
+            val dateFontSize = (screenWidth.value * 0.048f).coerceIn(11f, 13f).sp
 
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween
+            // Top-Right Battery Status Indicator (Smaller font, top-right aligned)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 4.dp, end = 6.dp)
+                    .background(
+                        color = Color.Black.copy(alpha = 0.30f),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                    .testTag("battery_status_row")
             ) {
-                // Top discreet spacer or subtle ambient indicator
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // Time & Date Group (Centered, guaranteed single line, no overflow)
-                val timeShiftX = uiState.burnInOffset.timeOffsetX
-                val timeShiftY = uiState.burnInOffset.timeOffsetY
-                val dateShiftX = uiState.burnInOffset.dateOffsetX
-                val dateShiftY = uiState.burnInOffset.dateOffsetY
-
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.padding(horizontal = 4.dp)
-                ) {
-                    // Main Digital Clock (Clean HH:mm display, maxLines = 1, softWrap = false)
-                    Text(
-                        text = uiState.timeSnapshot.timeText,
-                        color = Color.White,
-                        fontSize = timeFontSize,
-                        fontFamily = FontFamily.SansSerif,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = (-1.0).sp,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        softWrap = false,
-                        style = TextStyle(
-                            shadow = Shadow(
-                                color = Color.Black.copy(alpha = 0.95f),
-                                offset = Offset(0f, 4f),
-                                blurRadius = 16f
-                            )
-                        ),
-                        modifier = Modifier
-                            .offset { IntOffset(timeShiftX.roundToInt(), timeShiftY.roundToInt()) }
-                            .testTag("time_main_text")
-                    )
-
-                    // Date & Weekday Text with micro-phase sub-pixel shift
-                    Text(
-                        text = uiState.timeSnapshot.dateText,
-                        color = Color(0xFFF1F5F9),
-                        fontSize = dateFontSize,
-                        fontFamily = FontFamily.SansSerif,
-                        fontWeight = FontWeight.Normal,
-                        letterSpacing = 0.3.sp,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        softWrap = false,
-                        style = TextStyle(
-                            shadow = Shadow(
-                                color = Color.Black.copy(alpha = 0.95f),
-                                offset = Offset(0f, 2f),
-                                blurRadius = 10f
-                            )
-                        ),
-                        modifier = Modifier
-                            .offset { IntOffset(dateShiftX.roundToInt(), dateShiftY.roundToInt()) }
-                            .padding(top = 4.dp)
-                            .testTag("date_text")
-                    )
+                val batteryPct = uiState.timeSnapshot.batteryPct
+                val batteryColor = when {
+                    batteryPct <= 20 -> Color(0xFFEF4444)
+                    batteryPct <= 50 -> Color(0xFFF59E0B)
+                    else -> Color(0xFF10B981)
                 }
 
-                // Bottom Battery & Status Bar - Clean battery display
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
-                    modifier = Modifier
-                        .padding(bottom = 6.dp)
-                        .testTag("battery_status_row")
-                ) {
-                    val batteryPct = uiState.timeSnapshot.batteryPct
-                    val batteryColor = when {
-                        batteryPct <= 20 -> Color(0xFFEF4444)
-                        batteryPct <= 50 -> Color(0xFFF59E0B)
-                        else -> Color(0xFF10B981)
-                    }
+                Icon(
+                    imageVector = Icons.Default.BatteryFull,
+                    contentDescription = "电池电量",
+                    tint = batteryColor,
+                    modifier = Modifier.size(12.dp)
+                )
 
-                    Icon(
-                        imageVector = Icons.Default.BatteryFull,
-                        contentDescription = "电池电量",
-                        tint = batteryColor,
-                        modifier = Modifier.size(15.dp)
-                    )
+                Spacer(modifier = Modifier.width(3.dp))
 
-                    Spacer(modifier = Modifier.width(4.dp))
-
-                    Text(
-                        text = "$batteryPct%",
-                        color = Color(0xFFE2E8F0),
-                        fontSize = 13.sp,
-                        fontFamily = FontFamily.SansSerif,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        softWrap = false,
-                        style = TextStyle(
-                            shadow = Shadow(
-                                color = Color.Black.copy(alpha = 0.95f),
-                                offset = Offset(0f, 2f),
-                                blurRadius = 8f
-                            )
+                Text(
+                    text = "$batteryPct%",
+                    color = Color(0xFFE2E8F0),
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.SansSerif,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    softWrap = false,
+                    style = TextStyle(
+                        shadow = Shadow(
+                            color = Color.Black.copy(alpha = 0.95f),
+                            offset = Offset(0f, 1f),
+                            blurRadius = 6f
                         )
                     )
-                }
+                )
+            }
+
+            // Bottom-Center Time & Date Group (Smaller font, bottom positioned)
+            val timeShiftX = uiState.burnInOffset.timeOffsetX
+            val timeShiftY = uiState.burnInOffset.timeOffsetY
+            val dateShiftX = uiState.burnInOffset.dateOffsetX
+            val dateShiftY = uiState.burnInOffset.dateOffsetY
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 6.dp)
+            ) {
+                // Main Digital Clock (Smaller font at bottom, clean HH:mm display)
+                Text(
+                    text = uiState.timeSnapshot.timeText,
+                    color = Color.White,
+                    fontSize = timeFontSize,
+                    fontFamily = FontFamily.SansSerif,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.5).sp,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    softWrap = false,
+                    style = TextStyle(
+                        shadow = Shadow(
+                            color = Color.Black.copy(alpha = 0.95f),
+                            offset = Offset(0f, 2f),
+                            blurRadius = 12f
+                        )
+                    ),
+                    modifier = Modifier
+                        .offset { IntOffset(timeShiftX.roundToInt(), timeShiftY.roundToInt()) }
+                        .testTag("time_main_text")
+                )
+
+                // Date & Weekday Text with micro-phase sub-pixel shift
+                Text(
+                    text = uiState.timeSnapshot.dateText,
+                    color = Color(0xFFF1F5F9),
+                    fontSize = dateFontSize,
+                    fontFamily = FontFamily.SansSerif,
+                    fontWeight = FontWeight.Normal,
+                    letterSpacing = 0.2.sp,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    softWrap = false,
+                    style = TextStyle(
+                        shadow = Shadow(
+                            color = Color.Black.copy(alpha = 0.95f),
+                            offset = Offset(0f, 1f),
+                            blurRadius = 8f
+                        )
+                    ),
+                    modifier = Modifier
+                        .offset { IntOffset(dateShiftX.roundToInt(), dateShiftY.roundToInt()) }
+                        .padding(top = 1.dp)
+                        .testTag("date_text")
+                )
             }
         }
 
@@ -695,11 +693,11 @@ fun WatchFaceSettingsContent(
                             ) {
                                 Text(
                                     text = if (uiState.dirExists && uiState.dirImageCount > 0) {
-                                        "🟢 路径已生效 · 成功扫描到 ${uiState.dirImageCount} 张内置存储图片"
+                                        "🟢 路径已生效 · 仅在自定义 ${uiState.dirImageCount} 张图片中轮换 (已排除内置壁纸)"
                                     } else if (uiState.dirExists) {
-                                        "🟡 目录存在但无图片文件 · 自动使用 5 款内置高清壁纸"
+                                        "🟡 目录存在但无图片文件 · 临时使用 5 款内置高清壁纸"
                                     } else {
-                                        "⚠️ 文件夹尚未创建 (传输图片后自动创建) · 自动使用内置预设"
+                                        "⚠️ 文件夹尚未创建 (传输图片后自动识别) · 临时使用内置预设"
                                     },
                                     style = MaterialTheme.typography.bodySmall,
                                     fontSize = 11.sp,

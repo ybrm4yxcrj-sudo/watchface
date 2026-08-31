@@ -122,8 +122,11 @@ class ImageProvider(
             }
         } catch (_: Exception) { }
 
-        // Always include built-in high-quality presets so users have a rich collection
-        list.addAll(fallbackWallpapers)
+        // If custom images were found, use ONLY custom images (exclude built-in presets)
+        if (list.isEmpty()) {
+            // Only fallback to built-in presets when no custom images are present
+            list.addAll(fallbackWallpapers)
+        }
 
         currentWallpaperList = list
         return list
