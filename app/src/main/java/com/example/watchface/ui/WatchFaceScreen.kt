@@ -1,6 +1,13 @@
 package com.example.watchface.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
@@ -29,6 +36,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.BatteryFull
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
@@ -134,44 +142,51 @@ fun WatchFaceScreen(
             .testTag("watchface_container"),
         contentAlignment = Alignment.Center
     ) {
-        // 1. Wallpaper Image Layer (Full bleed CENTER_CROP, identical in ACTIVE and DIM states)
-        if (uiState.currentBitmap != null) {
-            val imageBitmap = remember(uiState.currentBitmap) {
-                uiState.currentBitmap.asImageBitmap()
-            }
-            Image(
-                bitmap = imageBitmap,
-                contentDescription = "Watch Face Wallpaper",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .testTag("wallpaper_image")
-            )
-        } else {
-            // Default deep AMOLED dark gradient if no image
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(Color(0xFF1E1B4B), Color(0xFF0F172A), Color.Black),
-                            center = Offset(200f, 200f),
-                            radius = 600f
+        // 1. Wallpaper Image Layer with smooth Crossfade Transition
+        Crossfade(
+            targetState = uiState.currentBitmap,
+            animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
+            modifier = Modifier.fillMaxSize(),
+            label = "wallpaper_crossfade"
+        ) { targetBitmap ->
+            if (targetBitmap != null) {
+                val imageBitmap = remember(targetBitmap) {
+                    targetBitmap.asImageBitmap()
+                }
+                Image(
+                    bitmap = imageBitmap,
+                    contentDescription = "Watch Face Wallpaper",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag("wallpaper_image")
+                )
+            } else {
+                // Default deep AMOLED dark gradient if no image
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(Color(0xFF1E1B4B), Color(0xFF0F172A), Color.Black),
+                                center = Offset(200f, 200f),
+                                radius = 600f
+                            )
                         )
-                    )
-            )
+                )
+            }
         }
 
-        // 2. Subtle bottom readability gradient for time & battery (identical across states)
+        // 2. High-contrast ambient readability scrim for time & complications
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
                         0.0f to Color.Transparent,
-                        0.50f to Color.Transparent,
-                        0.75f to Color(0x66000000),
-                        1.0f to Color(0xBB000000)
+                        0.45f to Color.Transparent,
+                        0.70f to Color(0x77000000),
+                        1.0f to Color(0xCC000000)
                     )
                 )
         )
@@ -251,7 +266,7 @@ fun WatchFaceScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Main Digital Clock (Clean HH:mm display without seconds)
+                // Main Digital Clock (Clean HH:mm display without seconds, ultra-readable drop shadow)
                 Text(
                     text = uiState.timeSnapshot.timeText,
                     color = Color.White,
@@ -262,9 +277,9 @@ fun WatchFaceScreen(
                     textAlign = TextAlign.Center,
                     style = TextStyle(
                         shadow = Shadow(
-                            color = Color.Black.copy(alpha = 0.85f),
+                            color = Color.Black.copy(alpha = 0.92f),
                             offset = Offset(0f, 4f),
-                            blurRadius = 12f
+                            blurRadius = 16f
                         )
                     ),
                     modifier = Modifier.testTag("time_main_text")
@@ -281,9 +296,9 @@ fun WatchFaceScreen(
                     textAlign = TextAlign.Center,
                     style = TextStyle(
                         shadow = Shadow(
-                            color = Color.Black.copy(alpha = 0.9f),
+                            color = Color.Black.copy(alpha = 0.95f),
                             offset = Offset(0f, 2f),
-                            blurRadius = 8f
+                            blurRadius = 10f
                         )
                     ),
                     modifier = Modifier
@@ -292,7 +307,23 @@ fun WatchFaceScreen(
                 )
             }
 
-            // Bottom Battery & Status Bar - Uniform styling in both states
+            // Bottom Battery & Status Bar (With charging pulse & indicator)
+            val isCharging = uiState.timeSnapshot.isCharging
+            val infiniteTransition = rememberInfiniteTransition(label = "battery_charge_pulse")
+            val chargeAlpha = if (isCharging) {
+                infiniteTransition.animateFloat(
+                    initialValue = 0.45f,
+                    targetValue = 1.0f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(durationMillis = 900, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "charge_pulse_alpha"
+                ).value
+            } else {
+                1.0f
+            }
+
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
@@ -302,31 +333,32 @@ fun WatchFaceScreen(
             ) {
                 val batteryPct = uiState.timeSnapshot.batteryPct
                 val batteryColor = when {
+                    isCharging -> Color(0xFF34D399) // Charging Green
                     batteryPct <= 20 -> Color(0xFFEF4444)
                     batteryPct <= 50 -> Color(0xFFF59E0B)
                     else -> Color(0xFF10B981)
                 }
 
                 Icon(
-                    imageVector = Icons.Default.BatteryFull,
-                    contentDescription = "电池电量",
-                    tint = batteryColor,
+                    imageVector = if (isCharging) Icons.Default.Bolt else Icons.Default.BatteryFull,
+                    contentDescription = if (isCharging) "充电中" else "电池电量",
+                    tint = batteryColor.copy(alpha = chargeAlpha),
                     modifier = Modifier.size(16.dp)
                 )
 
                 Spacer(modifier = Modifier.width(4.dp))
 
                 Text(
-                    text = "$batteryPct%",
-                    color = Color(0xFFE2E8F0),
+                    text = if (isCharging) "$batteryPct% ⚡" else "$batteryPct%",
+                    color = if (isCharging) Color(0xFFA7F3D0).copy(alpha = chargeAlpha) else Color(0xFFE2E8F0),
                     fontSize = 14.sp,
                     fontFamily = FontFamily.SansSerif,
                     fontWeight = FontWeight.Medium,
                     style = TextStyle(
                         shadow = Shadow(
-                            color = Color.Black.copy(alpha = 0.9f),
+                            color = Color.Black.copy(alpha = 0.95f),
                             offset = Offset(0f, 2f),
-                            blurRadius = 6f
+                            blurRadius = 8f
                         )
                     )
                 )

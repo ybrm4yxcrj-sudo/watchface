@@ -52,6 +52,19 @@ class WakeDetector(
         isRegistered = true
     }
 
+    fun setDimState(isDim: Boolean) {
+        if (!isRegistered || sensorManager == null) return
+        if (isDim) {
+            // Unregister light sensor in DIM to save battery, keep accelerometer for wake
+            lightSensor?.let { sensorManager.unregisterListener(this, it) }
+        } else {
+            // Re-register light sensor in ACTIVE mode
+            lightSensor?.let {
+                sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
+            }
+        }
+    }
+
     fun stopListening() {
         if (!isRegistered || sensorManager == null) return
         sensorManager.unregisterListener(this)

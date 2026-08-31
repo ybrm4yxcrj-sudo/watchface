@@ -18,6 +18,7 @@ data class TimeSnapshot(
     val secondsText: String,     // ":45" or "" in DIM
     val dateText: String,        // "周一 8月31日"
     val batteryPct: Int,         // 78
+    val isCharging: Boolean = false,
     val hourOfDay: Int,          // 10
     val minuteOfHour: Int        // 32
 )
@@ -73,11 +74,20 @@ class TimeTicker(
         val dateStr = dateFormat.format(now)
         val batteryPct = batteryManager?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: 85
 
+        val batteryStatusIntent = try {
+            context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        } catch (_: Exception) {
+            null
+        }
+        val status = batteryStatusIntent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+        val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+
         val snapshot = TimeSnapshot(
             timeText = timeStr,
             secondsText = "",
             dateText = dateStr,
             batteryPct = batteryPct,
+            isCharging = isCharging,
             hourOfDay = cal.get(Calendar.HOUR_OF_DAY),
             minuteOfHour = cal.get(Calendar.MINUTE)
         )
@@ -90,6 +100,9 @@ class TimeTicker(
                 addAction(Intent.ACTION_TIME_TICK)
                 addAction(Intent.ACTION_TIME_CHANGED)
                 addAction(Intent.ACTION_TIMEZONE_CHANGED)
+                addAction(Intent.ACTION_BATTERY_CHANGED)
+                addAction(Intent.ACTION_POWER_CONNECTED)
+                addAction(Intent.ACTION_POWER_DISCONNECTED)
             }
             context.registerReceiver(timeTickReceiver, filter)
             isReceiverRegistered = true

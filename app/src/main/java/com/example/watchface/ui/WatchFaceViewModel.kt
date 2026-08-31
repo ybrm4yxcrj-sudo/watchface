@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
 
 data class WatchFaceUiState(
     val state: WatchFaceState = WatchFaceState.ACTIVE,
-    val timeSnapshot: TimeSnapshot = TimeSnapshot("10:32", ":00", "周一 8月31日", 78, 10, 32),
+    val timeSnapshot: TimeSnapshot = TimeSnapshot("10:32", ":00", "周一 8月31日", 78, false, 10, 32),
     val currentBitmap: Bitmap? = null,
     val currentWallpaper: WatchWallpaper? = null,
     val allWallpapers: List<WatchWallpaper> = emptyList(),
@@ -58,19 +58,46 @@ class WatchFaceViewModel : ViewModel() {
     private var timeTicker: TimeTicker? = null
     private var imageProvider: ImageProvider? = null
     private val burnInGuard = BurnInGuard()
+    private var sharedPrefs: android.content.SharedPreferences? = null
 
     private var dimTimerJob: Job? = null
 
     fun initialize(activity: Activity) {
         val appContext = activity.applicationContext
+        sharedPrefs = appContext.getSharedPreferences("watchface_prefs", Context.MODE_PRIVATE)
+
+        // Load persisted settings
+        val savedModeName = sharedPrefs?.getString("pref_rotation_mode", ImageRotationMode.ON_WAKE.name)
+        val savedMode = try {
+            ImageRotationMode.valueOf(savedModeName ?: ImageRotationMode.ON_WAKE.name)
+        } catch (_: Exception) {
+            ImageRotationMode.ON_WAKE
+        }
+        val savedTimeout = sharedPrefs?.getLong("pref_active_timeout", Config.ACTIVE_TIMEOUT_MS) ?: Config.ACTIVE_TIMEOUT_MS
+        val savedScale = sharedPrefs?.getFloat("pref_dim_scale", Config.IMAGE_DIM_SCALE) ?: Config.IMAGE_DIM_SCALE
+        val savedShowDim = sharedPrefs?.getBoolean("pref_show_dim_img", true) ?: true
+        val savedIndex = sharedPrefs?.getInt("pref_wallpaper_index", 0) ?: 0
+
+        _uiState.update {
+            it.copy(
+                rotationMode = savedMode,
+                activeTimeoutMs = savedTimeout,
+                dimImageScale = savedScale,
+                showImageInDim = savedShowDim
+            )
+        }
 
         brightnessController = BrightnessController(activity)
         imageProvider = ImageProvider(appContext).apply {
-            setRotationMode(_uiState.value.rotationMode)
+            setRotationMode(savedMode)
         }
 
         val wallpapers = imageProvider!!.refreshWallpapers()
-        val initialBitmap = imageProvider!!.getWallpaperForMode(triggerWake = false)
+        val initialBitmap = if (savedMode == ImageRotationMode.FIXED && wallpapers.isNotEmpty()) {
+            imageProvider!!.selectWallpaperIndex(savedIndex)
+        } else {
+            imageProvider!!.getWallpaperForMode(triggerWake = false)
+        }
         val initialWp = imageProvider!!.getCurrentWallpaper()
 
         _uiState.update {
@@ -167,6 +194,7 @@ class WatchFaceViewModel : ViewModel() {
         if (isStateChange) {
             _uiState.update { it.copy(state = WatchFaceState.ACTIVE, lastWakeReason = reason) }
             timeTicker?.setState(WatchFaceState.ACTIVE)
+            wakeDetector?.setDimState(false)
 
             // Wallpaper rotation on wake
             if (_uiState.value.rotationMode == ImageRotationMode.ON_WAKE) {
@@ -189,6 +217,7 @@ class WatchFaceViewModel : ViewModel() {
         dimTimerJob?.cancel()
         _uiState.update { it.copy(state = WatchFaceState.DIM, lastWakeReason = reason) }
         timeTicker?.setState(WatchFaceState.DIM)
+        wakeDetector?.setDimState(true)
 
         brightnessController?.animateToState(WatchFaceState.DIM, _uiState.value.luxTier) { alpha ->
             _uiState.update { it.copy(overlayAlpha = alpha) }
@@ -206,10 +235,12 @@ class WatchFaceViewModel : ViewModel() {
     fun setRotationMode(mode: ImageRotationMode) {
         imageProvider?.setRotationMode(mode)
         _uiState.update { it.copy(rotationMode = mode) }
+        sharedPrefs?.edit()?.putString("pref_rotation_mode", mode.name)?.apply()
     }
 
     fun setActiveTimeout(timeoutMs: Long) {
         _uiState.update { it.copy(activeTimeoutMs = timeoutMs) }
+        sharedPrefs?.edit()?.putLong("pref_active_timeout", timeoutMs)?.apply()
         resetDimTimer()
     }
 
@@ -236,6 +267,7 @@ class WatchFaceViewModel : ViewModel() {
                 currentWallpaper = wp
             )
         }
+        sharedPrefs?.edit()?.putInt("pref_wallpaper_index", index)?.apply()
     }
 
     fun refreshWallpapers() {
@@ -258,11 +290,14 @@ class WatchFaceViewModel : ViewModel() {
     }
 
     fun setDimImageScale(scale: Float) {
-        _uiState.update { it.copy(dimImageScale = scale.coerceIn(0.2f, 1.0f)) }
+        val clamped = scale.coerceIn(0.2f, 1.0f)
+        _uiState.update { it.copy(dimImageScale = clamped) }
+        sharedPrefs?.edit()?.putFloat("pref_dim_scale", clamped)?.apply()
     }
 
     fun setShowImageInDim(enabled: Boolean) {
         _uiState.update { it.copy(showImageInDim = enabled) }
+        sharedPrefs?.edit()?.putBoolean("pref_show_dim_img", enabled)?.apply()
     }
 
     fun toggleSettings(open: Boolean? = null) {
