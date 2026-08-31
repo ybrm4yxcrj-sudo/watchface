@@ -260,8 +260,8 @@ fun WatchFaceScreen(
                 .testTag("watchface_content_root")
         ) {
             val screenWidth = maxWidth
-            val timeFontSize = (screenWidth.value * 0.135f).coerceIn(24f, 32f).sp
-            val dateFontSize = (screenWidth.value * 0.048f).coerceIn(11f, 13f).sp
+            val timeFontSize = (screenWidth.value * 0.175f).coerceIn(30f, 44f).sp
+            val dateFontSize = (screenWidth.value * 0.052f).coerceIn(12f, 15f).sp
 
             // Top-Right Battery Status Indicator (Smaller font, top-right aligned)
             Row(
