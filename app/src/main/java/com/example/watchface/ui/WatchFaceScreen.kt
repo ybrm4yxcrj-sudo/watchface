@@ -5,6 +5,7 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -134,22 +135,36 @@ fun WatchFaceScreen(
     val isDim = uiState.state == WatchFaceState.DIM
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // Color matrix for DIM state image dimming (Preserves vibrant colors and high clarity)
-    val imageColorFilter = remember(isDim, uiState.dimImageScale, uiState.showImageInDim) {
-        if (isDim) {
-            val scale = if (uiState.showImageInDim) uiState.dimImageScale.coerceIn(0.2f, 1.0f) else 0.05f
+    // Smoothly animate the wallpaper dim scale to prevent any frame-0 visual flashing
+    val targetScale = if (isDim) {
+        if (uiState.showImageInDim) uiState.dimImageScale.coerceIn(0.2f, 1.0f) else 0.05f
+    } else {
+        1.0f
+    }
+    val animatedScale by animateFloatAsState(
+        targetValue = targetScale,
+        animationSpec = tween(
+            durationMillis = if (isDim) Config.FADE_TO_DIM_MS.toInt() else Config.FADE_TO_ACTIVE_MS.toInt(),
+            easing = FastOutSlowInEasing
+        ),
+        label = "animated_dim_scale"
+    )
+
+    // Color matrix for smooth DIM state image dimming
+    val imageColorFilter = remember(animatedScale) {
+        if (animatedScale >= 0.999f) {
+            null
+        } else {
             ColorFilter.colorMatrix(
                 ColorMatrix(
                     floatArrayOf(
-                        scale, 0f, 0f, 0f, 0f,
-                        0f, scale, 0f, 0f, 0f,
-                        0f, 0f, scale, 0f, 0f,
+                        animatedScale, 0f, 0f, 0f, 0f,
+                        0f, animatedScale, 0f, 0f, 0f,
+                        0f, 0f, animatedScale, 0f, 0f,
                         0f, 0f, 0f, 1f, 0f
                     )
                 )
             )
-        } else {
-            null
         }
     }
 

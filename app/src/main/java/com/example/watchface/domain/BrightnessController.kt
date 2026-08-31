@@ -159,22 +159,7 @@ class BrightnessController(private val activity: Activity) {
         val (targetBrightness, targetAlpha) = getTargetDimProfile(state, tier, circadianFactor, isCircadianEnabled)
         val duration = if (state == WatchFaceState.DIM) Config.FADE_TO_DIM_MS else Config.FADE_TO_ACTIVE_MS
 
-        // Screen Brightness animation
-        val fromBrightness = if (currentScreenBrightness < 0f) 0.5f else currentScreenBrightness
-        val toBrightness = if (targetBrightness < 0f) 0.5f else targetBrightness
-
-        brightnessAnim?.cancel()
-        brightnessAnim = ValueAnimator.ofFloat(fromBrightness, toBrightness).apply {
-            this.duration = duration
-            interpolator = DecelerateInterpolator()
-            addUpdateListener { anim ->
-                val v = anim.animatedValue as Float
-                applyWindowBrightness(if (state == WatchFaceState.ACTIVE) Config.BRIGHTNESS_ACTIVE else v)
-            }
-            start()
-        }
-
-        // Dim Overlay Alpha animation
+        // Dim Overlay Alpha animation (Software AMOLED Dimming)
         overlayAnim?.cancel()
         overlayAnim = ValueAnimator.ofFloat(currentOverlayAlpha, targetAlpha).apply {
             this.duration = duration
@@ -185,6 +170,16 @@ class BrightnessController(private val activity: Activity) {
                 onAlphaUpdate(alpha)
             }
             start()
+        }
+
+        // Window Brightness update (Avoid rapid PWM/IPC stepping that causes backlight flicker)
+        brightnessAnim?.cancel()
+        if (state == WatchFaceState.ACTIVE) {
+            // Restore default system brightness smoothly
+            applyWindowBrightness(Config.BRIGHTNESS_ACTIVE)
+        } else {
+            // Apply dimmed target brightness without arbitrary intermediate jumps
+            applyWindowBrightness(targetBrightness)
         }
     }
 
