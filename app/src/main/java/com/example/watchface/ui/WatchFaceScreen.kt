@@ -15,6 +15,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -34,6 +35,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.Bolt
@@ -45,6 +48,8 @@ import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Nightlight
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
@@ -71,6 +76,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -84,6 +90,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
@@ -116,7 +123,12 @@ fun WatchFaceScreen(
     onSetShowImageInDim: (Boolean) -> Unit,
     onSetBurnInPixelShift: (Boolean) -> Unit = {},
     onSetCircadianBrightness: (Boolean) -> Unit = {},
-    onToggleSettings: (Boolean?) -> Unit
+    onToggleSettings: (Boolean?) -> Unit,
+    onExpandStatusBar: () -> Unit = {},
+    onExpandNotifications: () -> Unit = {},
+    onSetNotificationDotEnabled: (Boolean) -> Unit = {},
+    onOpenNotificationAccess: () -> Unit = {},
+    onToggleTestNotification: () -> Unit = {}
 ) {
     val isDim = uiState.state == WatchFaceState.DIM
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -140,10 +152,32 @@ fun WatchFaceScreen(
         }
     }
 
+    var verticalDragAccumulator by remember { mutableFloatStateOf(0f) }
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onVerticalDrag = { _, dragAmount ->
+                        verticalDragAccumulator += dragAmount
+                    },
+                    onDragEnd = {
+                        if (verticalDragAccumulator > 50f) {
+                            // Swiped down -> Pull down Status Bar / Quick Settings
+                            onExpandStatusBar()
+                        } else if (verticalDragAccumulator < -50f) {
+                            // Swiped up -> Pull up Notifications Panel
+                            onExpandNotifications()
+                        }
+                        verticalDragAccumulator = 0f
+                    },
+                    onDragCancel = {
+                        verticalDragAccumulator = 0f
+                    }
+                )
+            }
             .combinedClickable(
                 onClick = { onWake("触摸唤醒") },
                 onDoubleClick = {
@@ -335,6 +369,54 @@ fun WatchFaceScreen(
                         .padding(top = 1.dp)
                         .testTag("date_text")
                 )
+
+                // Unread Notification Red Dot Indicator (Bottom Center, pulsing breathing glow)
+                if (uiState.isNotificationDotEnabled && uiState.hasUnreadNotifications) {
+                    val infiniteTransition = rememberInfiniteTransition(label = "notif_dot_pulse")
+                    val dotAlpha by infiniteTransition.animateFloat(
+                        initialValue = 0.60f,
+                        targetValue = 1.0f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(900, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "dot_alpha"
+                    )
+                    val dotScale by infiniteTransition.animateFloat(
+                        initialValue = 0.85f,
+                        targetValue = 1.20f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(900, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "dot_scale"
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .padding(top = 4.dp)
+                            .size(18.dp)
+                            .combinedClickable(
+                                onClick = { onExpandNotifications() }
+                            )
+                            .testTag("notification_unread_dot"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // Soft outer red halo
+                        Box(
+                            modifier = Modifier
+                                .size((10 * dotScale).dp)
+                                .alpha(dotAlpha * 0.40f)
+                                .background(Color(0xFFEF4444), shape = CircleShape)
+                        )
+                        // Core vibrant red dot
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .background(Color(0xFFFF3B30), shape = CircleShape)
+                        )
+                    }
+                }
             }
         }
 
@@ -360,6 +442,11 @@ fun WatchFaceScreen(
                     onSetShowImageInDim = onSetShowImageInDim,
                     onSetBurnInPixelShift = onSetBurnInPixelShift,
                     onSetCircadianBrightness = onSetCircadianBrightness,
+                    onExpandStatusBar = onExpandStatusBar,
+                    onExpandNotifications = onExpandNotifications,
+                    onSetNotificationDotEnabled = onSetNotificationDotEnabled,
+                    onOpenNotificationAccess = onOpenNotificationAccess,
+                    onToggleTestNotification = onToggleTestNotification,
                     onClose = { onToggleSettings(false) }
                 )
             }
@@ -382,6 +469,11 @@ fun WatchFaceSettingsContent(
     onSetShowImageInDim: (Boolean) -> Unit,
     onSetBurnInPixelShift: (Boolean) -> Unit = {},
     onSetCircadianBrightness: (Boolean) -> Unit = {},
+    onExpandStatusBar: () -> Unit = {},
+    onExpandNotifications: () -> Unit = {},
+    onSetNotificationDotEnabled: (Boolean) -> Unit = {},
+    onOpenNotificationAccess: () -> Unit = {},
+    onToggleTestNotification: () -> Unit = {},
     onClose: () -> Unit
 ) {
     val scrollState = rememberScrollState()
@@ -1028,6 +1120,151 @@ fun WatchFaceSettingsContent(
                             style = MaterialTheme.typography.bodySmall,
                             color = Color(0xFF94A3B8)
                         )
+                    }
+                }
+            }
+        }
+
+        // Section 8: Notification Red Dot & System Gestures (通知红点与下拉/上拉手势)
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = Color(0xFFEF4444), modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "未读通知红点与系统手势",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    Switch(
+                        checked = uiState.isNotificationDotEnabled,
+                        onCheckedChange = { onSetNotificationDotEnabled(it) },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Color(0xFFEF4444),
+                            uncheckedThumbColor = Color(0xFF94A3B8),
+                            uncheckedTrackColor = Color(0xFF334155)
+                        )
+                    )
+                }
+
+                Text(
+                    text = "收到手表通知时，在表盘底部中央显示呼吸微光红点。下拉表盘直接呼出状态栏/快捷控制中心，上拉表盘直接呼出通知中心。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF94A3B8)
+                )
+
+                // Service Status Card
+                Surface(
+                    color = if (uiState.isNotificationAccessGranted) Color(0xFF064E3B) else Color(0xFF451A03),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (uiState.isNotificationAccessGranted) "🟢 通知监听服务已连接" else "⚠️ 未授权通知使用权",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (uiState.isNotificationAccessGranted) Color(0xFF6EE7B7) else Color(0xFFFDBA74),
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = if (uiState.isNotificationAccessGranted) {
+                                    "正在监听通知事件 (未读通知: ${uiState.unreadNotificationCount} 条)"
+                                } else {
+                                    "如需实时接收系统通知，请在系统设置中开启授权"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFFCBD5E1)
+                            )
+                        }
+
+                        if (!uiState.isNotificationAccessGranted) {
+                            Button(
+                                onClick = onOpenNotificationAccess,
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706)),
+                                modifier = Modifier.padding(start = 6.dp)
+                            ) {
+                                Text("去授权", fontSize = 11.sp)
+                            }
+                        }
+                    }
+                }
+
+                // Interactive gesture and notification trigger test buttons
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Button(
+                        onClick = onToggleTestNotification,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (uiState.hasUnreadNotifications) Color(0xFF991B1B) else Color(0xFF334155)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Notifications, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            if (uiState.hasUnreadNotifications) "🔔 测试红点生效中 (点击清除红点)" else "🔔 模拟收到新通知 (点亮红点)",
+                            fontSize = 11.sp
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = onExpandStatusBar,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.ArrowDownward, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("下拉呼出状态栏", fontSize = 10.sp)
+                        }
+
+                        Button(
+                            onClick = onExpandNotifications,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF475569)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.ArrowUpward, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("上拉呼出通知", fontSize = 10.sp)
+                        }
+                    }
+                }
+
+                Surface(
+                    color = Color(0xFF0F172A),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Text("💡 手势与交互说明：", style = MaterialTheme.typography.bodySmall, color = Color(0xFF38BDF8), fontWeight = FontWeight.SemiBold)
+                        Text("• 下拉手势：在表盘任意区域向下滑动，呼出快捷控制中心/状态栏", style = MaterialTheme.typography.bodySmall, color = Color(0xFFCBD5E1))
+                        Text("• 上拉手势：在表盘任意区域向上滑动，呼出系统通知中心", style = MaterialTheme.typography.bodySmall, color = Color(0xFFCBD5E1))
+                        Text("• 点击红点：在未读通知红点处轻触，直接打开系统通知中心", style = MaterialTheme.typography.bodySmall, color = Color(0xFFCBD5E1))
                     }
                 }
             }

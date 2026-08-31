@@ -49,7 +49,12 @@ class MainActivity : ComponentActivity() {
                     onSetShowImageInDim = { enabled -> viewModel.setShowImageInDim(enabled) },
                     onSetBurnInPixelShift = { enabled -> viewModel.setBurnInPixelShiftEnabled(enabled) },
                     onSetCircadianBrightness = { enabled -> viewModel.setCircadianBrightnessEnabled(enabled) },
-                    onToggleSettings = { open -> viewModel.toggleSettings(open) }
+                    onToggleSettings = { open -> viewModel.toggleSettings(open) },
+                    onExpandStatusBar = { viewModel.expandStatusBar(this@MainActivity) },
+                    onExpandNotifications = { viewModel.expandNotificationsPanel(this@MainActivity) },
+                    onSetNotificationDotEnabled = { enabled -> viewModel.setNotificationDotEnabled(enabled) },
+                    onOpenNotificationAccess = { viewModel.openNotificationAccessSettings(this@MainActivity) },
+                    onToggleTestNotification = { viewModel.toggleTestNotification() }
                 )
             }
         }
@@ -60,6 +65,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         applyImmersiveFullscreen()
+        viewModel.checkNotificationPermission(this)
         viewModel.wakeUp("页面恢复前台")
     }
 

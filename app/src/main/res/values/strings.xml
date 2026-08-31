@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">OPPO Watch 2 表盘</string>
+    <string name="notification_listener_service_name">表盘通知状态监听服务</string>
+    <string name="notification_dot_desc">未读通知提醒红点</string>
+    <string name="swipe_down_desc">下拉展开控制中心</string>
+    <string name="swipe_up_desc">上拉展开通知中心</string>
 </resources>

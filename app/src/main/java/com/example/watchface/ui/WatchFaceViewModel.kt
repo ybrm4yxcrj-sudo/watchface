@@ -14,6 +14,7 @@ import com.example.watchface.domain.BurnInGuard
 import com.example.watchface.domain.BurnInOffset
 import com.example.watchface.domain.CircadianProfile
 import com.example.watchface.domain.ImageProvider
+import com.example.watchface.domain.NotificationTracker
 import com.example.watchface.domain.TimeSnapshot
 import com.example.watchface.domain.TimeTicker
 import com.example.watchface.domain.WakeDetector
@@ -52,7 +53,11 @@ data class WatchFaceUiState(
     val motionMagnitudeDev: Float = 0f,
     val manualLuxOverride: Float? = null,
     val dimImageScale: Float = Config.IMAGE_DIM_SCALE,
-    val showImageInDim: Boolean = true
+    val showImageInDim: Boolean = true,
+    val unreadNotificationCount: Int = 0,
+    val hasUnreadNotifications: Boolean = false,
+    val isNotificationAccessGranted: Boolean = false,
+    val isNotificationDotEnabled: Boolean = true
 )
 
 class WatchFaceViewModel : ViewModel() {
@@ -87,8 +92,11 @@ class WatchFaceViewModel : ViewModel() {
         val savedPixelShift = sharedPrefs?.getBoolean("pref_pixel_shift", true) ?: true
         val savedCircadian = sharedPrefs?.getBoolean("pref_circadian_brightness", true) ?: true
         val savedCustomDir = sharedPrefs?.getString("pref_custom_image_dir", Config.IMAGE_DIR) ?: Config.IMAGE_DIR
+        val savedNotifDot = sharedPrefs?.getBoolean("pref_notif_dot", true) ?: true
 
         burnInGuard.setEnabled(savedPixelShift)
+        NotificationTracker.setDotEnabled(savedNotifDot)
+        NotificationTracker.checkPermission(appContext)
 
         brightnessController = BrightnessController(activity)
         val initialCircadian = brightnessController!!.calculateCircadianProfile(10, 32)
@@ -102,8 +110,26 @@ class WatchFaceViewModel : ViewModel() {
                 showImageInDim = savedShowDim,
                 isBurnInPixelShiftEnabled = savedPixelShift,
                 isCircadianBrightnessEnabled = savedCircadian,
-                circadianProfile = initialCircadian
+                circadianProfile = initialCircadian,
+                isNotificationDotEnabled = savedNotifDot,
+                isNotificationAccessGranted = NotificationTracker.state.value.isPermissionGranted,
+                unreadNotificationCount = NotificationTracker.state.value.unreadCount,
+                hasUnreadNotifications = NotificationTracker.state.value.hasUnread
             )
+        }
+
+        // Collect NotificationTracker changes
+        viewModelScope.launch {
+            NotificationTracker.state.collect { nState ->
+                _uiState.update {
+                    it.copy(
+                        unreadNotificationCount = nState.unreadCount,
+                        hasUnreadNotifications = nState.hasUnread,
+                        isNotificationAccessGranted = nState.isPermissionGranted,
+                        isNotificationDotEnabled = nState.isDotEnabled
+                    )
+                }
+            }
         }
 
         imageProvider = ImageProvider(appContext).apply {
@@ -410,6 +436,35 @@ class WatchFaceViewModel : ViewModel() {
         if (_uiState.value.isSettingsOpen) {
             wakeUp("打开设置")
         }
+    }
+
+    fun setNotificationDotEnabled(enabled: Boolean) {
+        NotificationTracker.setDotEnabled(enabled)
+        _uiState.update { it.copy(isNotificationDotEnabled = enabled) }
+        sharedPrefs?.edit()?.putBoolean("pref_notif_dot", enabled)?.apply()
+    }
+
+    fun checkNotificationPermission(context: Context) {
+        val granted = NotificationTracker.checkPermission(context)
+        _uiState.update { it.copy(isNotificationAccessGranted = granted) }
+    }
+
+    fun openNotificationAccessSettings(context: Context) {
+        NotificationTracker.openNotificationAccessSettings(context)
+    }
+
+    fun expandStatusBar(context: Context): Boolean {
+        wakeUp("手势下拉状态栏")
+        return NotificationTracker.expandStatusBar(context)
+    }
+
+    fun expandNotificationsPanel(context: Context): Boolean {
+        wakeUp("手势上拉通知栏")
+        return NotificationTracker.expandNotificationsPanel(context)
+    }
+
+    fun toggleTestNotification() {
+        NotificationTracker.toggleTestNotification()
     }
 
     override fun onCleared() {
