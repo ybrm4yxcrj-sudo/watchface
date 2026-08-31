@@ -6,9 +6,10 @@ enum class WatchFaceState {
 }
 
 enum class ImageRotationMode(val label: String, val description: String) {
-    FIXED("固定第一张", "固定显示目录中的第一张图片"),
+    ON_WAKE("唤醒时轮换", "每次从 DIM 唤醒到 ACTIVE 时随机换图"),
     HOURLY("按小时轮换", "每小时更换一张图片 (hour % count)"),
-    ON_WAKE("唤醒时轮换", "每次从 DIM 唤醒到 ACTIVE 时随机换图")
+    INTERVAL_15M("每15分钟", "每隔 15 分钟自动轮换下一张壁纸"),
+    FIXED("固定壁纸", "固定显示当前选中的单张图片")
 }
 
 enum class LuxTier(val displayName: String) {

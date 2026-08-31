@@ -53,7 +53,7 @@ class ExampleRobolectricTest {
 
     @Test
     fun `verify rotation modes and state values`() {
-        assertEquals(3, ImageRotationMode.values().size)
+        assertEquals(4, ImageRotationMode.values().size)
         assertEquals(2, WatchFaceState.values().size)
         assertEquals(3, LuxTier.values().size)
     }

@@ -118,9 +118,16 @@ class WatchFaceViewModel : ViewModel() {
             burnInGuard.getCurrentOffset(density)
         }
 
-        // Check hourly wallpaper rotation
-        if (_uiState.value.rotationMode == ImageRotationMode.HOURLY && snapshot.minuteOfHour == 0) {
-            val bmp = imageProvider?.getWallpaperForMode(triggerWake = false, currentHour = snapshot.hourOfDay)
+        // Check periodic wallpaper rotation (Hourly or 15m intervals)
+        val shouldRotateHourly = _uiState.value.rotationMode == ImageRotationMode.HOURLY && snapshot.minuteOfHour == 0
+        val shouldRotate15m = _uiState.value.rotationMode == ImageRotationMode.INTERVAL_15M && (snapshot.minuteOfHour % 15 == 0)
+
+        if (shouldRotateHourly || shouldRotate15m) {
+            val bmp = imageProvider?.getWallpaperForMode(
+                triggerWake = false,
+                currentHour = snapshot.hourOfDay,
+                currentMinute = snapshot.minuteOfHour
+            )
             val wp = imageProvider?.getCurrentWallpaper()
             _uiState.update { it.copy(currentBitmap = bmp, currentWallpaper = wp) }
         }
@@ -204,6 +211,20 @@ class WatchFaceViewModel : ViewModel() {
     fun setActiveTimeout(timeoutMs: Long) {
         _uiState.update { it.copy(activeTimeoutMs = timeoutMs) }
         resetDimTimer()
+    }
+
+    fun nextWallpaper() {
+        val bmp = imageProvider?.nextWallpaper()
+        val wp = imageProvider?.getCurrentWallpaper()
+        if (bmp != null) {
+            _uiState.update {
+                it.copy(
+                    currentBitmap = bmp,
+                    currentWallpaper = wp
+                )
+            }
+        }
+        wakeUp("双击切换壁纸")
     }
 
     fun selectWallpaperIndex(index: Int) {

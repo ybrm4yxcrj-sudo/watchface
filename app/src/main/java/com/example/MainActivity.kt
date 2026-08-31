@@ -38,6 +38,7 @@ class MainActivity : ComponentActivity() {
                     uiState = uiState,
                     onWake = { reason -> viewModel.wakeUp(reason) },
                     onForceDim = { viewModel.enterDim("手动强制压暗") },
+                    onNextWallpaper = { viewModel.nextWallpaper() },
                     onSetRotationMode = { mode -> viewModel.setRotationMode(mode) },
                     onSetActiveTimeout = { timeoutMs -> viewModel.setActiveTimeout(timeoutMs) },
                     onSelectWallpaper = { index -> viewModel.selectWallpaperIndex(index) },

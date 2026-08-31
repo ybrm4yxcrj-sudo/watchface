@@ -109,7 +109,15 @@ class ImageProvider(
         return currentWallpaperList.getOrNull(currentActiveIndex)
     }
 
-    fun getWallpaperForMode(triggerWake: Boolean = false, currentHour: Int = 0): Bitmap? {
+    fun nextWallpaper(): Bitmap? {
+        if (currentWallpaperList.isEmpty()) refreshWallpapers()
+        if (currentWallpaperList.isEmpty()) return null
+        currentActiveIndex = (currentActiveIndex + 1) % currentWallpaperList.size
+        val target = currentWallpaperList[currentActiveIndex]
+        return loadBitmap(target)
+    }
+
+    fun getWallpaperForMode(triggerWake: Boolean = false, currentHour: Int = 0, currentMinute: Int = 0): Bitmap? {
         if (currentWallpaperList.isEmpty()) {
             refreshWallpapers()
         }
@@ -117,10 +125,14 @@ class ImageProvider(
 
         when (rotationMode) {
             ImageRotationMode.FIXED -> {
-                currentActiveIndex = 0
+                // Keep currentActiveIndex unchanged
             }
             ImageRotationMode.HOURLY -> {
                 currentActiveIndex = (currentHour % currentWallpaperList.size).coerceIn(0, currentWallpaperList.size - 1)
+            }
+            ImageRotationMode.INTERVAL_15M -> {
+                val slot = (currentHour * 4 + (currentMinute / 15))
+                currentActiveIndex = (slot % currentWallpaperList.size).coerceIn(0, currentWallpaperList.size - 1)
             }
             ImageRotationMode.ON_WAKE -> {
                 if (triggerWake && currentWallpaperList.size > 1) {

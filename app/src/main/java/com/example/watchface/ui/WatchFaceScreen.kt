@@ -88,6 +88,7 @@ fun WatchFaceScreen(
     uiState: WatchFaceUiState,
     onWake: (String) -> Unit,
     onForceDim: () -> Unit,
+    onNextWallpaper: () -> Unit = {},
     onSetRotationMode: (ImageRotationMode) -> Unit,
     onSetActiveTimeout: (Long) -> Unit,
     onSelectWallpaper: (Int) -> Unit,
@@ -125,6 +126,9 @@ fun WatchFaceScreen(
             .background(Color.Black)
             .combinedClickable(
                 onClick = { onWake("触摸唤醒") },
+                onDoubleClick = {
+                    onNextWallpaper()
+                },
                 onLongClick = { onToggleSettings(true) }
             )
             .testTag("watchface_container"),
