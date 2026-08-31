@@ -19,6 +19,11 @@ import com.example.watchface.domain.TimeSnapshot
 import com.example.watchface.domain.TimeTicker
 import com.example.watchface.domain.WakeDetector
 import com.example.watchface.domain.WatchWallpaper
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Environment
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -57,7 +62,8 @@ data class WatchFaceUiState(
     val unreadNotificationCount: Int = 0,
     val hasUnreadNotifications: Boolean = false,
     val isNotificationAccessGranted: Boolean = false,
-    val isNotificationDotEnabled: Boolean = true
+    val isNotificationDotEnabled: Boolean = true,
+    val isStoragePermissionGranted: Boolean = true
 )
 
 class WatchFaceViewModel : ViewModel() {
@@ -435,6 +441,23 @@ class WatchFaceViewModel : ViewModel() {
         _uiState.update { it.copy(isSettingsOpen = open ?: !it.isSettingsOpen) }
         if (_uiState.value.isSettingsOpen) {
             wakeUp("打开设置")
+        }
+    }
+
+    fun checkStoragePermission(context: Context): Boolean {
+        val granted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
+        } else {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        }
+        _uiState.update { it.copy(isStoragePermissionGranted = granted) }
+        return granted
+    }
+
+    fun onStoragePermissionResult(granted: Boolean) {
+        _uiState.update { it.copy(isStoragePermissionGranted = granted) }
+        if (granted) {
+            refreshWallpapers()
         }
     }
 

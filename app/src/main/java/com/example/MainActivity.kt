@@ -1,7 +1,13 @@
 package com.example
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.Settings
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowInsets
@@ -9,9 +15,11 @@ import android.view.WindowInsetsController
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -23,12 +31,24 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: WatchFaceViewModel by viewModels()
 
+    private val storagePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val isGranted = permissions.values.any { it } || checkStoragePermission()
+        viewModel.onStoragePermissionResult(isGranted)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setupWatchWindowFlags()
 
         viewModel.initialize(this)
+
+        // Automatically prompt user for storage / media permissions if not yet granted
+        if (!checkStoragePermission()) {
+            requestStoragePermission()
+        }
 
         setContent {
             MyApplicationTheme {
@@ -54,7 +74,8 @@ class MainActivity : ComponentActivity() {
                     onExpandNotifications = { viewModel.expandNotificationsPanel(this@MainActivity) },
                     onSetNotificationDotEnabled = { enabled -> viewModel.setNotificationDotEnabled(enabled) },
                     onOpenNotificationAccess = { viewModel.openNotificationAccessSettings(this@MainActivity) },
-                    onToggleTestNotification = { viewModel.toggleTestNotification() }
+                    onToggleTestNotification = { viewModel.toggleTestNotification() },
+                    onRequestStoragePermission = { requestStoragePermission() }
                 )
             }
         }
@@ -66,7 +87,49 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         applyImmersiveFullscreen()
         viewModel.checkNotificationPermission(this)
+        viewModel.checkStoragePermission(this)
         viewModel.wakeUp("页面恢复前台")
+    }
+
+    private fun checkStoragePermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
+        } else {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    private fun getRequiredStoragePermissions(): Array<String> {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            arrayOf(Manifest.permission.READ_MEDIA_IMAGES)
+        } else {
+            arrayOf(
+                Manifest.permission.READ_EXTERNAL_STORAGE,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
+            )
+        }
+    }
+
+    private fun requestStoragePermission() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
+                try {
+                    val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                        data = Uri.parse("package:$packageName")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivity(intent)
+                    return
+                } catch (_: Exception) {
+                    // Fallback to standard request
+                }
+            }
+            storagePermissionLauncher.launch(getRequiredStoragePermissions())
+        } catch (e: Exception) {
+            try {
+                storagePermissionLauncher.launch(getRequiredStoragePermissions())
+            } catch (_: Exception) {}
+        }
     }
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {

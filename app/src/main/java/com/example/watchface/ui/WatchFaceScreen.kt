@@ -128,7 +128,8 @@ fun WatchFaceScreen(
     onExpandNotifications: () -> Unit = {},
     onSetNotificationDotEnabled: (Boolean) -> Unit = {},
     onOpenNotificationAccess: () -> Unit = {},
-    onToggleTestNotification: () -> Unit = {}
+    onToggleTestNotification: () -> Unit = {},
+    onRequestStoragePermission: () -> Unit = {}
 ) {
     val isDim = uiState.state == WatchFaceState.DIM
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -447,6 +448,7 @@ fun WatchFaceScreen(
                     onSetNotificationDotEnabled = onSetNotificationDotEnabled,
                     onOpenNotificationAccess = onOpenNotificationAccess,
                     onToggleTestNotification = onToggleTestNotification,
+                    onRequestStoragePermission = onRequestStoragePermission,
                     onClose = { onToggleSettings(false) }
                 )
             }
@@ -474,6 +476,7 @@ fun WatchFaceSettingsContent(
     onSetNotificationDotEnabled: (Boolean) -> Unit = {},
     onOpenNotificationAccess: () -> Unit = {},
     onToggleTestNotification: () -> Unit = {},
+    onRequestStoragePermission: () -> Unit = {},
     onClose: () -> Unit
 ) {
     val scrollState = rememberScrollState()
@@ -636,6 +639,47 @@ fun WatchFaceSettingsContent(
 
                     IconButton(onClick = onRefreshWallpapers) {
                         Icon(Icons.Default.Refresh, contentDescription = "刷新扫描目录", tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp))
+                    }
+                }
+
+                // Storage Permission Authorization Banner
+                Surface(
+                    color = if (uiState.isStoragePermissionGranted) Color(0xFF064E3B) else Color(0xFF451A03),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (uiState.isStoragePermissionGranted) "🟢 文件与图片读取权限已授权" else "⚠️ 未授予图片文件读取权限",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (uiState.isStoragePermissionGranted) Color(0xFF6EE7B7) else Color(0xFFFDBA74),
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = if (uiState.isStoragePermissionGranted) {
+                                    "可自由读取手表内部存储与相册壁纸"
+                                } else {
+                                    "点击立即弹出系统授权弹窗，授予文件读取权限"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFFCBD5E1)
+                            )
+                        }
+
+                        if (!uiState.isStoragePermissionGranted) {
+                            Button(
+                                onClick = onRequestStoragePermission,
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706)),
+                                modifier = Modifier.padding(start = 6.dp)
+                            ) {
+                                Text("立即授权", fontSize = 11.sp)
+                            }
+                        }
                     }
                 }
 
